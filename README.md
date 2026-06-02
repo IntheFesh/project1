@@ -47,6 +47,10 @@ capability **sm_120**, so **CUDA 12.8+ is required**.
 | RTX 5090 (32 GB) | QLoRA (4-bit) | AWQ / FP8 | out of scope (won't fit) |
 | RTX PRO 6000 (96 GB) | LoRA + bf16 | bf16 / FP8 | feasible (STRETCH) |
 
+**Default build profile for this repo: RTX PRO 6000 (96 GB)** — bf16 LoRA-SFT + bf16 serving
+(FP8 as a throughput ablation); GRPO is in scope as a STRETCH single-card run. The 5090 fallback
+profile (QLoRA + FP8) is preserved in `configs/`.
+
 - Pin **cu128** torch wheels: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128`,
   then verify `python -c "import torch; print(torch.cuda.get_arch_list())"` contains `sm_120`.
 - **Do not** use cu124/cu126 wheels on Blackwell — they only compile up to sm_90 and fail at
@@ -115,7 +119,7 @@ state in app/server memory (no browser `localStorage`/`sessionStorage`).
 All numbers are filled from real runs only and reported with **95% bootstrap CIs (≥10k resamples)**.
 Latency is measured on an **exclusive (non-time-sliced) GPU**.
 
-| Track | Benchmark / Metric | Base Qwen3-8B | + QLoRA-SFT | Notes |
+| Track | Benchmark / Metric | Base Qwen3-8B | + LoRA-SFT | Notes |
 | --- | --- | --- | --- | --- |
 | Tool-calling | τ²-bench retail · pass^1 | TBD | TBD | combinatorial pass^k |
 | Tool-calling | τ²-bench retail · pass^4 | TBD | TBD | E[C(c,k)/C(n,k)] |
@@ -136,7 +140,7 @@ Latency is measured on an **exclusive (non-time-sliced) GPU**.
 - [ ] **Phase 4** — Observability (Langfuse tracing + prompt versioning)
 - [ ] **Phase 5** — Eval harness + statistics (τ²-bench, BFCL-V4, RAG-triad, bootstrap, pass^k)
 - [ ] **Phase 6** — CI/CD deterministic eval gate
-- [ ] **Phase 7** — Fine-tuning (QLoRA-SFT CORE; GRPO STRETCH)
+- [ ] **Phase 7** — Fine-tuning (LoRA/QLoRA-SFT CORE; GRPO STRETCH — feasible on the PRO 6000)
 - [ ] **Phase 8** — Deploy (`docker compose up`) + technical report
 
 CORE items ship first; STRETCH items are attempted only after CORE works and with the owner's

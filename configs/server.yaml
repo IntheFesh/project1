@@ -1,10 +1,13 @@
 # Serving (OpenAI-compatible). PRIMARY engine = SGLang (lmsysorg/sglang:blackwell).
+# DEFAULT TARGET = RTX PRO 6000 (96GB): serve bf16 (no --quantization). On a 5090,
+# set sglang.quantization to "fp8" (or awq). fp8 is also a throughput ablation here.
 backend: "sglang"                    # sglang | vllm | ollama
 
 sglang:
   model_path: "Qwen/Qwen3-8B"
   host: "0.0.0.0"
   port: 30000
+  # quantization: "fp8"              # uncomment for fp8 serving (5090, or throughput)
   tool_call_parser: "qwen25"
   reasoning_parser: "qwen3"
   attention_backend: "flashinfer"
