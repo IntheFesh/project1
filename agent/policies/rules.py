@@ -31,3 +31,13 @@ def refund_allowed(
         else f"refund window ({window_days}d) exceeded: {days_since_purchase}d since purchase"
     )
     return PolicyDecision(rule_id="refund_window", allowed=allowed, reason=reason)
+
+
+def modify_allowed(shipped: bool) -> PolicyDecision:
+    """Decide whether an order may be modified directly (only if not yet shipped)."""
+    reason = (
+        "已发货订单不可直接改单，请创建工单走人工处理"
+        if shipped
+        else "未发货订单可直接修改"
+    )
+    return PolicyDecision(rule_id="modify_after_ship", allowed=not shipped, reason=reason)

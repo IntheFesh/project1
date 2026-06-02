@@ -26,7 +26,7 @@ Blackwell sm_120, CUDA 12.8+; QLoRA (5090) / LoRA-bf16 (PRO 6000). Seeds, config
 - RAG triad (TruLens).
 - Bootstrap 95% CIs (≥10k resamples); paired comparison + Holm–Bonferroni.
 
-| Metric | Base | + QLoRA-SFT | 95% CI | Notes |
+| Metric | Base | + LoRA-SFT | 95% CI | Notes |
 | --- | --- | --- | --- | --- |
 | (filled from real runs) | TBD | TBD | TBD | |
 

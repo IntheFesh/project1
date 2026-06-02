@@ -28,8 +28,13 @@ jobs:
       - name: Test
         run: uv run pytest
 
-      # ---- Phase 6: deterministic eval gate (fixed seed, fixed slice, greedy) ----
-      # Added in Phase 6: run a small eval slice and fail CI if a key metric < threshold.
-      # The gate is deterministic (temperature=0) so the same input yields the same
-      # pass/fail decision twice. Headline multi-seed + bootstrap CIs live in Phase 5/8,
-      # NOT in this gate.
+      # Deterministic eval gate: fixed slice, greedy (temperature=0). Runs the mock
+      # backend in CI so the decision is reproducible without a GPU; on the box it runs
+      # against SGLang. Headline multi-seed + bootstrap CIs are Phase 5/8, NOT this gate.
+      - name: Eval gate (deterministic)
+        run: uv run python -m eval.gate
+
+      - name: Build image
+        run: docker build -t policyarena:ci .
+        # The Dockerfile lands in Phase 8; this step is a no-op placeholder until then.
+        if: ${{ false }}

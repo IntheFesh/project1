@@ -4,8 +4,9 @@ model:
   edge_ablation_id: "Qwen/Qwen3-4B"  # edge ablation
   stretch_compare_id: "Qwen3.5-9B"   # STRETCH only; gated behind a smoke test
   dtype: "bfloat16"
-  # Serving quantization. 5090 default = fp8/awq; PRO 6000 may serve bf16.
-  quantization: "fp8"                # none | fp8 | awq
+  # Serving quantization. DEFAULT TARGET = RTX PRO 6000 (96GB) -> bf16 ("none").
+  # On a 5090, use fp8/awq. fp8 is also a throughput ablation on the PRO 6000.
+  quantization: "none"               # none | fp8 | awq
   max_model_len: 32768
 
 thinking:

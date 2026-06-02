@@ -54,3 +54,10 @@ class AgentState(BaseModel):
     def policy_ok(self) -> bool:
         """True iff no policy violation has been recorded this turn."""
         return len(self.violations) == 0
+
+    def last_user_text(self) -> str:
+        """Return the most recent user message content (empty string if none)."""
+        for message in reversed(self.messages):
+            if message.role == "user":
+                return message.content
+        return ""

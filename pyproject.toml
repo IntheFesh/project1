@@ -33,6 +33,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Demo chat UI (Phase 2). Installed with: uv sync --extra ui
+ui = ["gradio>=4.44"]
 # Self-hostable observability (Phase 4). Installed with: uv sync --extra obs
 obs = ["langfuse>=2.40"]
 # Tabular eval/reporting helpers (Phase 5). Installed with: uv sync --extra eval

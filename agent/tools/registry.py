@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from agent.tools.schemas import TOOL_SPECS
+from agent.tools.services import ServiceDesk
 
 
 def validate_args(tool_name: str, raw_args: dict[str, Any]) -> BaseModel:
@@ -31,3 +32,15 @@ def is_valid(tool_name: str, raw_args: dict[str, Any]) -> bool:
     except (KeyError, ValidationError):
         return False
     return True
+
+
+def execute(services: ServiceDesk, tool_name: str, raw_args: dict[str, Any]) -> dict[str, Any]:
+    """Validate ``raw_args`` then dispatch to the matching ServiceDesk method.
+
+    Raises:
+        KeyError: if ``tool_name`` is unknown.
+        pydantic.ValidationError: if ``raw_args`` are invalid.
+    """
+    validated = validate_args(tool_name, raw_args)
+    method = getattr(services, tool_name)
+    return method(**validated.model_dump())
