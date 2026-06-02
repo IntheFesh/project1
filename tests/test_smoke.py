@@ -5,6 +5,7 @@ import importlib
 import pytest
 
 MODULES = [
+    "common.config",
     "agent",
     "agent.state",
     "agent.graph",
@@ -15,7 +16,9 @@ MODULES = [
     "agent.nodes.responder",
     "agent.tools.schemas",
     "agent.tools.registry",
+    "agent.tools.services",
     "agent.policies.rules",
+    "serving.client",
     "rag.ingest",
     "rag.index",
     "rag.retrieve",

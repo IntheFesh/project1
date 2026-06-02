@@ -100,9 +100,9 @@ _ORDER_RE = re.compile(r"\b([A-Z]\d{3,})\b")
 # Intent keywords -> tool name. Order matters (first match wins).
 _INTENT_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("refund", ("退款", "退货", "refund")),
-    ("modify_order", ("修改", "改地址", "改单", "modify", "change")),
+    ("modify_order", ("修改", "改", "地址", "modify", "change")),
     ("create_ticket", ("工单", "投诉", "人工", "ticket", "complaint")),
-    ("query_order", ("查询", "订单状态", "物流", "query", "status", "order")),
+    ("query_order", ("查询", "查", "订单", "状态", "物流", "query", "status", "order")),
     ("search_kb", ("政策", "怎么", "如何", "faq", "policy", "?", "？")),
 ]
 
