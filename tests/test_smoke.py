@@ -29,6 +29,8 @@ MODULES = [
     "api.main",
     "api.auth",
     "api.ratelimit",
+    "observability.tracing",
+    "observability.prompts",
     "finetune.build_sft_data",
     "finetune.train_lora",
     "finetune.train_grpo",

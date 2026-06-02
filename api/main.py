@@ -7,6 +7,7 @@ backend is resolved from settings (SERVING_BACKEND); set it to ``mock`` to run o
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from dotenv import load_dotenv
@@ -23,6 +24,7 @@ from agent.tools.services import ServiceDesk
 from api.auth import verify_static_token
 from api.ratelimit import build_limiter
 from common.config import get_settings
+from observability.tracing import get_tracer
 from rag.pipeline import build_default_kb_search
 from serving.client import LLMClient, get_client
 
@@ -79,14 +81,28 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.state.services = ServiceDesk(kb_search=build_default_kb_search())
     app.state.checkpointer = MemorySaver()
+    app.state.tracer = get_tracer()
 
     def _run(message: str, thread_id: str, client: LLMClient) -> AgentState:
         graph = build_graph(client, app.state.services, checkpointer=app.state.checkpointer)
+        start = time.perf_counter()
         result = graph.invoke(
             {"messages": [{"role": "user", "content": message}]},
             config={"configurable": {"thread_id": thread_id}},
         )
-        return result if isinstance(result, AgentState) else AgentState.model_validate(result)
+        state = result if isinstance(result, AgentState) else AgentState.model_validate(result)
+        app.state.tracer.trace_turn(
+            user=message,
+            thread_id=thread_id,
+            plan=state.plan,
+            tool=state.selected_tool.name if state.selected_tool else None,
+            policy_ok=state.policy_ok,
+            violations=[v.rule_id for v in state.violations],
+            citations=[c.doc_id for c in state.citations],
+            final_answer=state.final_answer,
+            latency_ms=round((time.perf_counter() - start) * 1000, 2),
+        )
+        return state
 
     @app.get("/health")
     def health() -> dict[str, str]:
