@@ -1,8 +1,9 @@
 """End-to-end agent graph scenarios (deterministic mock client)."""
 
 import pytest
+from langgraph.checkpoint.memory import MemorySaver
 
-from agent.graph import run_turn
+from agent.graph import build_graph, run_turn
 from agent.tools.services import ServiceDesk
 from rag.pipeline import build_default_kb_search
 from serving.client import ScriptedLLMClient
@@ -54,3 +55,15 @@ def test_knowledge_query_is_grounded_and_cited(client) -> None:
     assert state.selected_tool.name == "search_kb"
     assert state.citations
     assert "引用" in (state.final_answer or "")
+
+
+def test_same_thread_does_not_leak_state_across_turns(client) -> None:
+    services = ServiceDesk(kb_search=build_default_kb_search())
+    graph = build_graph(client, services, checkpointer=MemorySaver())
+    first = run_turn("订单 A1009 我要退款", client, services, thread_id="t", graph=graph)
+    assert not first.policy_ok  # refund past window is refused
+    second = run_turn("请问运费是怎么计算的？", client, services, thread_id="t", graph=graph)
+    assert second.selected_tool.name == "search_kb"
+    assert second.policy_ok  # no stale violation carried over
+    assert "无法" not in (second.final_answer or "")  # no stale refusal carried over
+    assert second.citations
