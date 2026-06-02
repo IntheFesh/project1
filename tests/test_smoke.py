@@ -41,6 +41,7 @@ MODULES = [
     "eval.tasks",
     "eval.stats",
     "eval.report",
+    "eval.gate",
     "eval.run_tau2",
     "eval.run_bfcl",
     "eval.rag_triad",
