@@ -23,6 +23,7 @@ from agent.tools.services import ServiceDesk
 from api.auth import verify_static_token
 from api.ratelimit import build_limiter
 from common.config import get_settings
+from rag.pipeline import build_default_kb_search
 from serving.client import LLMClient, get_client
 
 
@@ -76,7 +77,7 @@ def create_app() -> FastAPI:
     limiter = build_limiter()
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    app.state.services = ServiceDesk()
+    app.state.services = ServiceDesk(kb_search=build_default_kb_search())
     app.state.checkpointer = MemorySaver()
 
     def _run(message: str, thread_id: str, client: LLMClient) -> AgentState:

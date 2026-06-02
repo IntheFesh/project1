@@ -4,6 +4,7 @@ import pytest
 
 from agent.graph import run_turn
 from agent.tools.services import ServiceDesk
+from rag.pipeline import build_default_kb_search
 from serving.client import ScriptedLLMClient
 
 
@@ -45,3 +46,11 @@ def test_modify_shipped_order_refused(client, services) -> None:
     assert state.selected_tool.name == "modify_order"
     assert not state.policy_ok
     assert any(v.rule_id == "modify_after_ship" for v in state.violations)
+
+
+def test_knowledge_query_is_grounded_and_cited(client) -> None:
+    services = ServiceDesk(kb_search=build_default_kb_search())
+    state = run_turn("请问运费是怎么计算的？", client, services)
+    assert state.selected_tool.name == "search_kb"
+    assert state.citations
+    assert "引用" in (state.final_answer or "")

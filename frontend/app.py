@@ -14,10 +14,11 @@ import json
 from agent.graph import build_graph
 from agent.state import AgentState
 from agent.tools.services import ServiceDesk
+from rag.pipeline import build_default_kb_search
 from serving.client import get_client
 
 _CLIENT = get_client()
-_SERVICES = ServiceDesk()
+_SERVICES = ServiceDesk(kb_search=build_default_kb_search())
 _GRAPH = build_graph(_CLIENT, _SERVICES)
 
 
