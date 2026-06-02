@@ -1,0 +1,31 @@
+# Evaluation + statistics configuration.
+benchmarks:
+  tau2:
+    repo: "github.com/sierra-research/tau2-bench"
+    domains: ["retail", "knowledge"]   # airline/telecom are STRETCH
+    pass_k: [1, 2, 4]
+  bfcl:
+    version: "BFCL-V4"                 # record the version explicitly
+    metric: "ast_accuracy"
+  rag_triad:
+    metrics: ["groundedness", "context_relevance", "answer_relevance"]
+
+statistics:
+  bootstrap_resamples: 10000           # >= 10k resamples for 95% CIs
+  ci: 0.95
+  seed: 42
+  multiple_comparison: "holm-bonferroni"
+
+ci_gate:
+  # DETERMINISTIC pass/fail gate (Phase 6): fixed seed, fixed slice, greedy.
+  deterministic: true
+  temperature: 0.0
+  task_slice: "smoke"
+  thresholds:
+    schema_valid_rate: 0.95
+    tool_accuracy: 0.70
+
+latency:
+  # p50/p95 MUST be measured on an EXCLUSIVE (non-time-sliced) GPU.
+  exclusive_gpu_required: true
+  percentiles: [50, 95, 99]

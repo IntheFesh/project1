@@ -1,0 +1,105 @@
+# PolicyArena stack. SKELETON — finalized in Phase 8 (`docker compose up`).
+# The sglang service requires a Blackwell GPU (sm_120) + NVIDIA Container Toolkit.
+# Build contexts (agent-api, frontend) get Dockerfiles in Phase 8.
+
+services:
+  # ---- Serving: SGLang (PRIMARY), OpenAI-compatible, Blackwell AOT kernels ----
+  sglang:
+    image: lmsysorg/sglang:blackwell
+    shm_size: "16g"
+    ipc: host
+    ports:
+      - "30000:30000"
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    command: >
+      python3 -m sglang.launch_server
+      --model-path Qwen/Qwen3-8B
+      --host 0.0.0.0 --port 30000
+      --tool-call-parser qwen25
+      --reasoning-parser qwen3
+      --attention-backend flashinfer
+      --mem-fraction-static 0.85
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+
+  # ---- RAG vector store: Milvus standalone (needs etcd + minio) ----
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes:
+      - ./volumes/etcd:/etcd
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    command: minio server /minio_data
+    volumes:
+      - ./volumes/minio:/minio_data
+
+  milvus:
+    image: milvusdb/milvus:v2.4.5
+    command: ["milvus", "run", "standalone"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    ports:
+      - "19530:19530"
+    depends_on:
+      - etcd
+      - minio
+    volumes:
+      - ./volumes/milvus:/var/lib/milvus
+
+  # ---- Observability: Langfuse (self-hosted) + its Postgres ----
+  langfuse-db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=langfuse
+      - POSTGRES_PASSWORD=langfuse
+      - POSTGRES_DB=langfuse
+    volumes:
+      - ./volumes/langfuse-db:/var/lib/postgresql/data
+
+  langfuse:
+    image: langfuse/langfuse:2
+    depends_on:
+      - langfuse-db
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=changeme
+      - SALT=changeme
+
+  # ---- App: agent API + frontend (Dockerfiles added in Phase 8) ----
+  agent-api:
+    build: .
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - sglang
+      - milvus
+    profiles: ["app"]   # opt-in until the Dockerfile lands in Phase 8
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "7860:7860"
+    depends_on:
+      - agent-api
+    profiles: ["app"]   # opt-in until the Dockerfile lands in Phase 8

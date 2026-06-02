@@ -1,0 +1,15 @@
+# Model configuration. CORE model is Qwen/Qwen3-8B (NOTE: no -Instruct suffix).
+model:
+  id: "Qwen/Qwen3-8B"                 # CORE
+  edge_ablation_id: "Qwen/Qwen3-4B"  # edge ablation
+  stretch_compare_id: "Qwen3.5-9B"   # STRETCH only; gated behind a smoke test
+  dtype: "bfloat16"
+  # Serving quantization. 5090 default = fp8/awq; PRO 6000 may serve bf16.
+  quantization: "fp8"                # none | fp8 | awq
+  max_model_len: 32768
+
+thinking:
+  # Tool-selection / policy path defaults to NON-thinking for clean structured
+  # output and lower latency. If enabled, reasoning_parser MUST be set.
+  enabled: false
+  reasoning_parser: "qwen3"

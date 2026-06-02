@@ -1,0 +1,27 @@
+# RAG: LlamaIndex + Milvus + bge embeddings/reranker + hybrid (BM25 + dense).
+embedding:
+  model: "BAAI/bge-m3"               # alt: BAAI/bge-large-zh-v1.5
+  dim: 1024
+  normalize: true
+
+reranker:
+  model: "BAAI/bge-reranker-v2-m3"
+  top_n: 5
+
+chunking:
+  chunk_size: 512
+  chunk_overlap: 64
+
+vector_store:
+  provider: "milvus"
+  uri: "${MILVUS_URI}"
+  collection: "policyarena_kb"
+  metric_type: "IP"
+
+retrieval:
+  mode: "hybrid"                     # dense | bm25 | hybrid
+  dense_top_k: 20
+  bm25_top_k: 20
+  fusion: "rrf"                      # reciprocal rank fusion
+  final_top_k: 5
+  require_citations: true

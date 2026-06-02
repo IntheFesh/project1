@@ -1,0 +1,12 @@
+# RAG deps — heavier stack (pulls torch). Install on the box that runs ingest/index.
+#   uv pip install -r requirements/rag.txt
+#
+# On Blackwell, install torch from the cu128 index FIRST (see requirements/train.txt).
+
+llama-index-core>=0.11
+llama-index-embeddings-huggingface>=0.3
+llama-index-vector-stores-milvus>=0.2
+pymilvus>=2.4
+FlagEmbedding>=1.2     # bge-m3 / bge-reranker-v2
+sentence-transformers>=3.0
+rank-bm25>=0.2

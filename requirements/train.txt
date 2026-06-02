@@ -1,0 +1,18 @@
+# Training deps — install ONLY on the Blackwell GPU box (sm_120). NOT in the uv lock.
+#
+# Torch MUST come from the CUDA 12.8 index. cu124/cu126 wheels only compile up to
+# sm_90 and fail at runtime: "no kernel image is available for execution on the device".
+#
+#   1) torch from the cu128 index:
+#        uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   2) verify sm_120 is present:
+#        python -c "import torch; print(torch.cuda.get_arch_list())"   # must contain sm_120
+#   3) then install the rest:
+#        uv pip install -r requirements/train.txt
+
+transformers>=4.51
+peft>=0.13
+trl>=0.12
+datasets>=3.0
+accelerate>=1.0
+bitsandbytes>=0.44   # QLoRA 4-bit base (RTX 5090 default)

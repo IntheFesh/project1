@@ -1,0 +1,60 @@
+[project]
+name = "policyarena"
+version = "0.1.0"
+description = "PolicyArena — a policy-compliant tool-calling + RAG agent platform (Qwen3 / SGLang / LangGraph / Milvus)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "PolicyArena Contributors" }]
+keywords = ["llm", "agent", "rag", "tool-calling", "qwen", "sglang", "langgraph", "policy"]
+
+# Light, GPU-free runtime so `uv sync` is fast and reproducible off the GPU box.
+# Heavy / CUDA stacks (training, RAG embeddings, serving engines) are pinned in
+# requirements/*.txt and installed per-phase on the Blackwell box. See README.
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "numpy>=1.26",
+    "scipy>=1.13",
+    "httpx>=0.27",
+    "openai>=1.40",
+    "tenacity>=8.5",
+    "rich>=13.7",
+    "typer>=0.12",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "sse-starlette>=2.1",
+    "slowapi>=0.1.9",
+    "pyjwt>=2.9",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+# Self-hostable observability (Phase 4). Installed with: uv sync --extra obs
+obs = ["langfuse>=2.40"]
+# Tabular eval/reporting helpers (Phase 5). Installed with: uv sync --extra eval
+eval = ["pandas>=2.2", "datasets>=2.20"]
+
+[dependency-groups]
+dev = ["pytest>=8.2", "ruff>=0.6"]
+
+[tool.uv]
+# Virtual project: install dependencies into a venv, do not build/install the repo
+# itself. Top-level packages (agent/, rag/, ...) are imported via pytest pythonpath.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]  # long URLs / docstrings in scaffolding are fine
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
