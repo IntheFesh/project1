@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# uv / virtualenv
+.venv/
+
+# Environment & secrets (keep the example)
+.env
+.env.*
+!.env.example
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+
+# Models, data, outputs (kept out of git per the 50GB budget)
+data/
+models/
+weights/
+outputs/
+runs/
+logs/
+*.log
+*.gguf
+*.safetensors
+*.bin
+
+# Service volumes (Milvus / Langfuse / etc.)
+volumes/
+milvus/
+.langfuse/
+
+# Notebooks / OS / editors
+.ipynb_checkpoints/
+.DS_Store
+.idea/
+.vscode/

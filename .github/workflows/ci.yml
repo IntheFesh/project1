@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.8.17"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Sync (light runtime + dev tools)
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Test
+        run: uv run pytest
+
+      # ---- Phase 6: deterministic eval gate (fixed seed, fixed slice, greedy) ----
+      # Added in Phase 6: run a small eval slice and fail CI if a key metric < threshold.
+      # The gate is deterministic (temperature=0) so the same input yields the same
+      # pass/fail decision twice. Headline multi-seed + bootstrap CIs live in Phase 5/8,
+      # NOT in this gate.

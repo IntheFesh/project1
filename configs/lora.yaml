@@ -1,0 +1,29 @@
+# Fine-tuning (PEFT). QLoRA is the DEFAULT on a single RTX 5090 (32GB, sm_120).
+# On an RTX PRO 6000 (96GB) you may switch method=lora + bf16 with a larger batch.
+method: "qlora"                      # qlora | lora
+base_model: "Qwen/Qwen3-8B"
+
+quantization:
+  load_in_4bit: true                 # QLoRA 4-bit base (5090)
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: "all-linear"
+
+train:
+  per_device_train_batch_size: 2     # scale up on PRO 6000
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  num_train_epochs: 2
+  warmup_ratio: 0.03
+  max_seq_len: 4096
+  bf16: true
+  seed: 42
+
+output:
+  adapter_dir: "outputs/adapters/qwen3-8b-policyarena"
+  save_adapter_only: true

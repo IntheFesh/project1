@@ -1,0 +1,11 @@
+# Eval deps for the external benchmarks (Phase 5). Install where evals run.
+#   uv pip install -r requirements/eval.txt
+#
+# tau2-bench and BFCL are installed from source per their READMEs; pin the exact
+# commit/version in report/technical_report.md when you run them.
+#   - tau2-bench: github.com/sierra-research/tau2-bench
+#   - BFCL-V4: gorilla-llm berkeley-function-call-leaderboard (record the V4 version)
+
+trulens-eval>=1.0     # RAG triad (groundedness / context / answer relevance)
+pandas>=2.2
+datasets>=2.20
