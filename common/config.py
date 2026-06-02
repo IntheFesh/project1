@@ -35,7 +35,11 @@ def load_yaml(name: str) -> dict[str, Any]:
 
     Environment references such as ``${MILVUS_URI}`` are expanded on load.
     """
-    path = Path(name) if Path(name).is_absolute() else CONFIG_DIR / name
+    candidate = Path(name)
+    if candidate.is_absolute() or candidate.exists():
+        path = candidate
+    else:
+        path = CONFIG_DIR / name
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"{path} did not parse to a mapping")
