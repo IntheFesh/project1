@@ -1,6 +1,7 @@
-# PolicyArena stack. SKELETON — finalized in Phase 8 (`docker compose up`).
-# The sglang service requires a Blackwell GPU (sm_120) + NVIDIA Container Toolkit.
-# Build contexts (agent-api, frontend) get Dockerfiles in Phase 8.
+# PolicyArena — FULL stack (Blackwell GPU box). One command:
+#   cp .env.example .env && docker compose up --build
+# Needs an NVIDIA Blackwell GPU + the NVIDIA Container Toolkit (for the sglang service).
+# For an off-GPU app-only demo use docker-compose.app.yml instead.
 
 services:
   # ---- Serving: SGLang (PRIMARY), OpenAI-compatible, Blackwell AOT kernels ----
@@ -30,7 +31,7 @@ services:
               count: all
               capabilities: ["gpu"]
 
-  # ---- RAG vector store: Milvus standalone (needs etcd + minio) ----
+  # ---- RAG vector store: Milvus standalone (etcd + minio) ----
   etcd:
     image: quay.io/coreos/etcd:v3.5.5
     environment:
@@ -63,7 +64,7 @@ services:
     volumes:
       - ./volumes/milvus:/var/lib/milvus
 
-  # ---- Observability: Langfuse (self-hosted) + its Postgres ----
+  # ---- Observability: Langfuse + Postgres ----
   langfuse-db:
     image: postgres:16
     environment:
@@ -85,21 +86,37 @@ services:
       - NEXTAUTH_SECRET=changeme
       - SALT=changeme
 
-  # ---- App: agent API + frontend (Dockerfiles added in Phase 8) ----
+  # ---- App: agent API + Gradio UI (pointed at the SGLang backend) ----
   agent-api:
-    build: .
-    env_file: .env
+    build:
+      context: .
+    image: policyarena:api
+    env_file: [.env]
+    environment:
+      - SERVING_BACKEND=sglang
+      - OPENAI_BASE_URL=http://sglang:30000/v1
+      - OPENAI_API_KEY=EMPTY
+      - MODEL_ID=Qwen/Qwen3-8B
+      - MILVUS_URI=http://milvus:19530
+      - LANGFUSE_HOST=http://langfuse:3000
     ports:
-      - "8080:8080"
+      - "8000:8000"
     depends_on:
       - sglang
       - milvus
-    profiles: ["app"]   # opt-in until the Dockerfile lands in Phase 8
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: policyarena:ui
+    env_file: [.env]
+    environment:
+      - SERVING_BACKEND=sglang
+      - OPENAI_BASE_URL=http://sglang:30000/v1
+      - OPENAI_API_KEY=EMPTY
+      - MODEL_ID=Qwen/Qwen3-8B
     ports:
       - "7860:7860"
     depends_on:
       - agent-api
-    profiles: ["app"]   # opt-in until the Dockerfile lands in Phase 8

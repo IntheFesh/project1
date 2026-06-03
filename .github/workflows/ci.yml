@@ -34,7 +34,5 @@ jobs:
       - name: Eval gate (deterministic)
         run: uv run python -m eval.gate
 
-      - name: Build image
+      - name: Build app image
         run: docker build -t policyarena:ci .
-        # The Dockerfile lands in Phase 8; this step is a no-op placeholder until then.
-        if: ${{ false }}
