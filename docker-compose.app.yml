@@ -1,0 +1,27 @@
+# PolicyArena — app-only stack (off-GPU, deterministic mock backend). One command:
+#   docker compose -f docker-compose.app.yml up --build
+# Runs the agent API (:8000) + Gradio UI (:7860) with no GPU, no Milvus, no Langfuse.
+# Great for a laptop demo / CI smoke. Swap SERVING_BACKEND to point at a real server.
+
+services:
+  agent-api:
+    build:
+      context: .
+    image: policyarena:api
+    environment:
+      - SERVING_BACKEND=${SERVING_BACKEND:-mock}
+      - API_AUTH_TOKEN=${API_AUTH_TOKEN:-dev-token}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: policyarena:ui
+    environment:
+      - SERVING_BACKEND=${SERVING_BACKEND:-mock}
+    ports:
+      - "7860:7860"
+    depends_on:
+      - agent-api
