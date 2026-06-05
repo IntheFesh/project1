@@ -24,6 +24,47 @@ A reviewer's #1 trust test is **data hygiene**. So the plan front-loads leakage 
 
 ---
 
+## 0b. Hardware reality (REVISED): RTX 5090 (32 GB) on AutoDL, ≤5 GPU-days
+
+The repo currently defaults to **RTX PRO 6000 (96 GB)**. The author's actual box is a
+**rented RTX 5090 (32 GB) on AutoDL**, billed by the hour with a **≤5-day budget**. This
+changes the targets:
+
+| Concern | Repo default | 5090 reality → action |
+| --- | --- | --- |
+| Training | LoRA + bf16 | **QLoRA 4-bit** (`configs/lora.yaml`: `method: qlora`, `load_in_4bit: true`, `per_device_train_batch_size: 2`) |
+| GRPO | "feasible (STRETCH)" | **Dropped** — won't fit 32 GB and burns budget |
+| Serving | bf16 8B (~16 GB) | Fits on 32 GB; serve via SGLang. **Docker is available** on this instance |
+| RAG | Milvus (docker) | Keep lean: **in-memory index** to save RAM/time (Milvus only if time permits) |
+| Observability | Langfuse full stack | Optional; no-op or Langfuse **cloud** — don't spend GPU-days on infra |
+| Model download | HF direct | AutoDL intl. network is limited → **`HF_ENDPOINT=https://hf-mirror.com`** |
+| τ²-bench user sim | (n/a) | Author has an **external LLM API key** → user-simulator/judge runs on cheap API; the **5090 serves only the agent-under-test** (saves VRAM + time) |
+
+**Budget discipline:** do *all* A–G off-GPU first; power the 5090 on **only** for the GPU
+steps and **power off between runs** (AutoDL stops GPU billing when shut down). Flip the
+repo's default profile to **5090/QLoRA** (README + `configs/lora.yaml` + report).
+
+### 5-day budget runbook (recommended, ROI-ordered)
+
+| # | Step | GPU? | Est. GPU-hours | Priority |
+| --- | --- | --- | --- | --- |
+| 1 | Env + `HF_ENDPOINT` mirror + download Qwen3-8B | yes | 0.5–1.5 | P0 |
+| 2 | Build scaled SFT data (CPU) | no | 0 | P0 |
+| 3 | QLoRA train (≈1k samples, 2 ep) | yes | 1–3 | P0 |
+| 4 | Serve base + adapter (SGLang) | yes | setup 0.5 | P0 |
+| 5 | **Self-built zh eval** (base vs +LoRA) | yes | 0.5–1 | **P0** |
+| 6 | **BFCL-V4** (local 8B handler) | yes | 2–5 | **P0** |
+| 7 | **τ²-bench retail** (agent=5090, user-sim=API) | yes | 2–5 | P1 (headline) |
+| 8 | τ²-bench knowledge | yes | 2–4 | P2 (if budget) |
+| 9 | Latency p50/p95 (exclusive GPU) | yes | 0.5 | P1 |
+| 10 | Bootstrap CIs + paired tests + failure analysis | no | 0 | P0 |
+
+≈ **10–20 GPU-hours** of actual compute → fits ≤5 calendar days with power-off between
+steps and a healthy buffer for breakage/reruns. Scope guard: BFCL-V4 + zh domain are the
+must-haves; τ²-bench retail is the headline; knowledge is stretch.
+
+---
+
 ## Phase A — Leakage guard + train/eval data split  (off-GPU, FOUNDATION)
 
 **Problem found in review:** `finetune/build_sft_data.py` trains on the *same* order ids
@@ -162,18 +203,23 @@ set (asserted by the Phase A test extended to the scaled output).
 
 ---
 
-## On-GPU run checklist (author runs on the Blackwell box)
+## On-GPU run checklist (author runs on the AutoDL RTX 5090)
 
-1. `uv pip install -r requirements/{train,rag,eval}.txt` (cu128 torch first).
-2. `python -m finetune.build_sft_data` (scaled set).
-3. `python -m finetune.train_lora` → adapter in `outputs/adapters/...`.
+0. `export HF_ENDPOINT=https://hf-mirror.com` (AutoDL intl. network).
+1. cu128 torch, then `uv pip install -r requirements/{train,rag,eval}.txt`.
+2. `python -m finetune.build_sft_data` (scaled set; CPU — can run before power-on).
+3. `python -m finetune.train_lora` (**QLoRA 4-bit**, bs=2) → adapter in `outputs/adapters/...`.
 4. Serve **base** and **+adapter** via `serving/sglang_server.sh`.
-5. `python -m eval.zh_service_desk` (base vs +LoRA) → zh metrics.
-6. `python -c "from eval.run_bfcl import run; run()"` → BFCL-V4 AST accuracy.
-7. `python -c "from eval.run_tau2 import run; run('retail'); run('knowledge')"` → pass^k.
-8. `python -m eval.results` → bootstrap CIs + paired bootstrap + Holm–Bonferroni.
+5. `python -m eval.zh_service_desk` (base vs +LoRA) → zh metrics. **[P0]**
+6. `python -c "from eval.run_bfcl import run; run()"` → BFCL-V4 AST accuracy. **[P0]**
+7. `python -c "from eval.run_tau2 import run; run('retail')"` → pass^k
+   (user-simulator on the **external API**, agent on the 5090). **[P1 headline]**
+8. (budget permitting) `run('knowledge')`. **[P2]**
 9. Latency p50/p95 on the **exclusive** GPU.
-10. Failure analysis → fill `report/*` tables (real numbers only).
+10. `python -m eval.results` → bootstrap CIs + paired bootstrap + Holm–Bonferroni;
+    failure analysis → fill `report/*` tables (real numbers only).
+
+**Power off the AutoDL instance between steps to stop GPU billing.**
 
 ---
 
