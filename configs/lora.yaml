@@ -1,11 +1,11 @@
-# Fine-tuning (PEFT). DEFAULT TARGET = RTX PRO 6000 (96GB, sm_120) -> LoRA + bf16.
-# On a single RTX 5090 (32GB), switch to QLoRA: method=qlora, load_in_4bit=true,
-# and drop per_device_train_batch_size to ~2.
-method: "lora"                       # lora (PRO 6000) | qlora (5090)
+# Fine-tuning (PEFT). DEFAULT TARGET = RTX 5090 (32GB, sm_120) -> QLoRA 4-bit.
+# On an RTX PRO 6000 (96GB), switch to bf16 LoRA: method=lora, load_in_4bit=false,
+# and raise per_device_train_batch_size to ~8.
+method: "qlora"                      # qlora (5090, default) | lora (PRO 6000)
 base_model: "Qwen/Qwen3-8B"
 
 quantization:
-  load_in_4bit: false                # true => QLoRA 4-bit base (5090)
+  load_in_4bit: true                 # QLoRA 4-bit base (5090); false => bf16 (PRO 6000)
   bnb_4bit_compute_dtype: "bfloat16"
   bnb_4bit_quant_type: "nf4"
 
@@ -16,8 +16,8 @@ lora:
   target_modules: "all-linear"
 
 train:
-  per_device_train_batch_size: 8     # 96GB headroom; drop to ~2 on a 5090
-  gradient_accumulation_steps: 2     # effective batch = 16
+  per_device_train_batch_size: 2     # fits 32GB; raise to ~8 on a PRO 6000
+  gradient_accumulation_steps: 8     # effective batch = 16
   learning_rate: 2.0e-4
   num_train_epochs: 2
   warmup_ratio: 0.03
