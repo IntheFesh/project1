@@ -133,6 +133,11 @@ class ScriptedLLMClient:
             return LLMResponse(content=self._compose_answer(messages))
 
         forced = self._forced_tool(tool_choice)
+        # In a multi-step loop, once a tool result has been observed, terminate with an
+        # answer instead of calling another tool (the real model decides this itself).
+        if forced is None and any(m.get("role") == "tool" for m in messages):
+            return LLMResponse(content=self._compose_answer(messages))
+
         tool_name = forced or self._select_tool(last_user)
         if tool_name is None:
             return LLMResponse(content=self._compose_answer(messages))

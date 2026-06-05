@@ -100,10 +100,17 @@ class SGLangConfig(_Cfg):
     quantization: str | None = None
 
 
+class AgentCfg(_Cfg):
+    # max_steps=1 keeps the single-tool-per-turn behavior (CI gate, zh eval, BFCL).
+    # Set >1 for multi-step agentic loops (tau2-bench).
+    max_steps: int = 1
+
+
 class ServerConfig(_Cfg):
     backend: str = "sglang"
     sglang: SGLangConfig = Field(default_factory=SGLangConfig)
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
+    agent: AgentCfg = Field(default_factory=AgentCfg)
 
 
 class RetrievalCfg(_Cfg):
