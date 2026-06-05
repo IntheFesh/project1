@@ -111,36 +111,49 @@ def _order_trajectories(svc: ServiceDesk, oid: str, data: dict[str, Any]) -> lis
     q = svc.query_order(oid)
     status, amount = q.get("status"), q.get("amount")
 
-    # Query (a couple of phrasings).
-    for user in (f"帮我查一下订单 {oid} 的状态", f"订单 {oid} 现在是什么情况"):
+    # Query (several phrasings).
+    for user in (f"帮我查一下订单 {oid} 的状态", f"订单 {oid} 现在是什么情况",
+                 f"看下 {oid} 这个单子到哪了", f"{oid} 的物流状态查一下"):
         out.append(_single(user, "query_order", {"order_id": oid}, q,
                            f"订单 {oid} 当前状态为 {status}，金额 {amount} 元。"))
 
-    # Refund: execute within window, else refuse.
+    # Refund: execute within window, else refuse (check first).
+    refund_users = (f"订单 {oid} 我要退款", f"{oid} 这个订单申请退款", f"帮我把订单 {oid} 退了")
     if data["days_since_purchase"] <= REFUND_WINDOW_DAYS:
-        res = svc.refund(oid, None, "用户申请退款")
-        out.append(_single(f"订单 {oid} 我要退款", "refund",
-                           {"order_id": oid, "amount": None, "reason": "用户申请退款"}, res,
-                           f"已为订单 {oid} 提交退款，金额 {res['amount']} 元，将原路退回。"))
+        for user in refund_users:
+            res = svc.refund(oid, None, "用户申请退款")
+            out.append(_single(user, "refund",
+                               {"order_id": oid, "amount": None, "reason": "用户申请退款"}, res,
+                               f"已为订单 {oid} 提交退款，金额 {res['amount']} 元，将原路退回。"))
     else:
-        out.append(_refusal(f"订单 {oid} 我要退款", "query_order", {"order_id": oid}, q,
-                            f"很抱歉，订单 {oid} 已超过 {REFUND_WINDOW_DAYS} 天退款窗口，无法直接退款。"
-                            "如有需要，我可以为您创建人工工单。"))
+        for user in refund_users:
+            out.append(_refusal(user, "query_order", {"order_id": oid}, q,
+                                f"很抱歉，订单 {oid} 已超过 {REFUND_WINDOW_DAYS} 天退款窗口，无法直接退款。"
+                                "如有需要，我可以为您创建人工工单。"))
 
-    # Modify: execute if unshipped, else refuse and offer a ticket.
+    # Modify: execute if unshipped (varied fields), else refuse and offer a ticket.
     if not data["shipped"]:
-        res = svc.modify_order(oid, {"address": "新地址"})
-        out.append(_single(f"订单 {oid} 还没发货，帮我改下收货地址", "modify_order",
-                           {"order_id": oid, "changes": {"address": "新地址"}}, res,
-                           f"已更新订单 {oid} 的收货地址。"))
+        variants = [
+            (f"订单 {oid} 还没发货，帮我改下收货地址", {"address": "新的收货地址"}, "收货地址"),
+            (f"{oid} 修改一下联系电话", {"phone": "13800000000"}, "联系电话"),
+            (f"{oid} 改一下收货人姓名", {"recipient": "张三"}, "收货人姓名"),
+        ]
+        for user, changes, label in variants:
+            res = svc.modify_order(oid, changes)
+            out.append(_single(user, "modify_order", {"order_id": oid, "changes": changes}, res,
+                               f"已更新订单 {oid} 的{label}。"))
     else:
-        out.append(_refusal(f"把订单 {oid} 的地址改一下", "query_order", {"order_id": oid}, q,
-                            f"订单 {oid} 已发货，无法直接修改收货信息，建议创建工单由人工处理，是否需要？"))
+        for user in (f"把订单 {oid} 的地址改一下", f"{oid} 改下收货人电话"):
+            out.append(_refusal(user, "query_order", {"order_id": oid}, q,
+                                f"订单 {oid} 已发货，无法直接修改收货信息，建议创建工单由人工处理，是否需要？"))
     return out
 
 
 # KB phrasings here are deliberately DIFFERENT from the held-out eval prompts.
-_KB_QUERIES: list[str] = ["邮费是怎么收的？", "退款会原路返回吗？", "客服多久会回复工单？", "忘记登录密码了怎么处理？"]
+_KB_QUERIES: list[str] = [
+    "邮费是怎么收的？", "快递费用如何计算？", "退款会原路返回吗？", "退款到账需要几天？",
+    "客服多久会回复工单？", "工单一般多长时间解决？", "忘记登录密码了怎么处理？", "账号登录不上怎么办？",
+]
 
 
 def _knowledge_trajectories(svc: ServiceDesk) -> list[SFTSample]:
@@ -158,6 +171,8 @@ def _ticket_trajectories(svc: ServiceDesk) -> list[SFTSample]:
     specs = [
         ("帮我开个工单反馈一个问题", "问题反馈", "用户反馈一个问题", "normal"),
         ("我要联系人工客服处理", "人工处理", "用户请求人工客服处理", "high"),
+        ("商品有质量问题，给我登记一下", "质量问题", "用户反馈商品质量问题", "high"),
+        ("这个情况比较急，麻烦加急处理", "加急请求", "用户请求加急处理", "urgent"),
     ]
     for user, subject, desc, prio in specs:
         res = svc.create_ticket(subject, desc, prio)
