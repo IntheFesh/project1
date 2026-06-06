@@ -69,7 +69,7 @@ Legend: **FALSE** (contradicts the real run) · **ASPIRATIONAL** (described as d
 | 7 | "competitive among open ≤10B" as current · README:247 | **ASPIRATIONAL** | Reframe as future target (no leaderboard run). Current claim: *significant within-domain gain + zero policy violations*. |
 | 8 | mermaid `SGLang / vLLM`, `Milvus / in-memory` · README:56–58 | **misleading** | Redraw: **vLLM** engine, **in-memory hybrid RAG**, loop `max_steps=2`. |
 | 9 | unsafe_selection regression unmentioned in README | **OMISSION** | Carry over case_study's honest account (28.6→71.4%, p=0.072 n.s.; root cause overfit + stricter detector; gate keeps violations at 0). |
-| 10 | one_pager.md stack line still SGLang/Milvus/Langfuse · one_pager:6–7,19 | **FALSE** | Update to vLLM/in-memory; it already carries real numbers elsewhere — make it internally consistent. |
+| 10 | one_pager.md / technical_report.md / resume_bullets.md | **TRUE (post-sync)** | Already updated with the real numbers + vLLM/cu130 (this row was flagged from the pre-sync stale commit; corrected after fast-forwarding to `main`). |
 
 ---
 
