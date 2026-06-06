@@ -64,7 +64,7 @@ Legend: **FALSE** (contradicts the real run) · **ASPIRATIONAL** (described as d
 | 2 | "τ²-bench, BFCL-V4, TruLens RAG-triad" headline · README:5,43,265–270 | **ASPIRATIONAL** | **Not run.** Mark as future work; present no number. |
 | 3 | "live **SGLang** serving … `lmsysorg/sglang:blackwell` … flashinfer" · README:13,58,64,97,179,188,212–213 | **FALSE** | `VLLM_USE_FLASHINFER_SAMPLER=0 vllm serve Qwen/Qwen3-8B --enable-auto-tool-choice --tool-call-parser hermes --reasoning-parser qwen3` (per `BLACKWELL_NOTES.md`). |
 | 4 | "**cu128** / CUDA 12.8+" · README:96,122,282; requirements/train.txt:3–7; rag.txt | **FALSE** | **cu130 / CUDA 13.0**: torch 2.11+cu130, vLLM 0.22.1, flashinfer 0.6.11.post2+cu130, bitsandbytes 0.49.2. |
-| 5 | "**127 tests green** / 100+ tests" · README:8,84,139 | **FALSE** | Suite is **red** (9 failing, see §1). After the Phase-D fix, report the real passing count (~151 collected). |
+| 5 | "**127 tests green** / 100+ tests" · README:8,84,139 | **FALSE → fixed** | Was red (9 failing, see §1); after the harness fix the suite is **green at 128 tests** — the count the README now states. |
 | 6 | Results rows = `TBD` · README:264–270 | **STALE-TBD** | Fill **service-desk** rows from `results/*.json` (§0). Keep τ²/BFCL/TruLens/latency rows explicitly "not yet run". |
 | 7 | "competitive among open ≤10B" as current · README:247 | **ASPIRATIONAL** | Reframe as future target (no leaderboard run). Current claim: *significant within-domain gain + zero policy violations*. |
 | 8 | mermaid `SGLang / vLLM`, `Milvus / in-memory` · README:56–58 | **misleading** | Redraw: **vLLM** engine, **in-memory hybrid RAG**, loop `max_steps=2`. |

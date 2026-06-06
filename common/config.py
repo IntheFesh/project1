@@ -53,7 +53,7 @@ class Settings(BaseSettings):
         env_file=".env", extra="ignore", case_sensitive=False
     )
 
-    serving_backend: str = "sglang"
+    serving_backend: str = "vllm"  # vLLM is the engine used on Blackwell; "mock" off-GPU
     openai_base_url: str = "http://localhost:30000/v1"
     openai_api_key: str = "EMPTY"
     model_id: str = "Qwen/Qwen3-8B"
@@ -107,7 +107,7 @@ class AgentCfg(_Cfg):
 
 
 class ServerConfig(_Cfg):
-    backend: str = "sglang"
+    backend: str = "vllm"
     sglang: SGLangConfig = Field(default_factory=SGLangConfig)
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
     agent: AgentCfg = Field(default_factory=AgentCfg)

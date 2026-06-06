@@ -1,7 +1,7 @@
 """Run tau2-bench (retail + knowledge) against our served model; report pass^k.
 
 ``run()`` drives the *sierra-research/tau2-bench* CLI with the **agent** LLM pointed at our
-SGLang endpoint (the model under test) and the **user-simulator** LLM pointed at an external
+vLLM endpoint (the model under test) and the **user-simulator** LLM pointed at an external
 API (cheap, saves the GPU's VRAM/time). It collects per-task pass/fail and aggregates pass^k
 with bootstrap CIs (``eval/results.py``). Executed on the GPU box; ``smoke()`` validates the
 harness off-GPU. The results parser is pure and unit-tested.

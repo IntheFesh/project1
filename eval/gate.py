@@ -3,7 +3,7 @@
 Fixed task slice, greedy decoding (temperature=0) -> the SAME input yields the SAME
 pass/fail decision every run. It checks schema-valid rate and tool accuracy against the
 thresholds in ``configs/eval.yaml``. In CI it runs the deterministic ScriptedLLMClient (no
-GPU); on the box it would run against SGLang at temperature=0. This gate intentionally does
+GPU); on the box it would run against vLLM at temperature=0. This gate intentionally does
 NOT use noisy multi-seed/bootstrap estimates — those are for headline results (Phase 5/8).
 """
 
