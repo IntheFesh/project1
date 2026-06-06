@@ -19,7 +19,7 @@ train:
   per_device_train_batch_size: 2     # fits 32GB; raise to ~8 on a PRO 6000
   gradient_accumulation_steps: 8     # effective batch = 16
   learning_rate: 2.0e-4
-  num_train_epochs: 2
+  num_train_epochs: 4
   warmup_ratio: 0.03
   max_seq_len: 4096
   bf16: true

@@ -1,0 +1,11 @@
+{
+  "label": "zh-service-desk",
+  "n": 32,
+  "success_rate": 0.78125,
+  "tool_accuracy": 0.6666666666666666,
+  "args_match_rate": 0.7222222222222222,
+  "grounding_rate": 0.75,
+  "negative_handling_rate": 1.0,
+  "unsafe_selection_rate": 0.42857142857142855,
+  "policy_violation_rate": 0.0
+}

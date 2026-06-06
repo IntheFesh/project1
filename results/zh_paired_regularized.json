@@ -1,0 +1,93 @@
+{
+  "label": "Base vs +LoRA (regularized)",
+  "comparisons": [
+    {
+      "name": "success_rate",
+      "base_mean": 0.53125,
+      "lora_mean": 0.71875,
+      "base_ci": [
+        0.34375,
+        0.6875
+      ],
+      "lora_ci": [
+        0.5625,
+        0.875
+      ],
+      "mean_diff": 0.1875,
+      "diff_ci": [
+        0.0,
+        0.375
+      ],
+      "p_value": 0.0622,
+      "adjusted_p": 0.1866,
+      "significant": false,
+      "higher_is_better": true
+    },
+    {
+      "name": "grounding_rate",
+      "base_mean": 0.25,
+      "lora_mean": 0.5,
+      "base_ci": [
+        0.0,
+        0.625
+      ],
+      "lora_ci": [
+        0.125,
+        0.875
+      ],
+      "mean_diff": 0.25,
+      "diff_ci": [
+        0.0,
+        0.625
+      ],
+      "p_value": 0.201,
+      "adjusted_p": 0.402,
+      "significant": false,
+      "higher_is_better": true
+    },
+    {
+      "name": "negative_handling",
+      "base_mean": 1.0,
+      "lora_mean": 1.0,
+      "base_ci": [
+        1.0,
+        1.0
+      ],
+      "lora_ci": [
+        1.0,
+        1.0
+      ],
+      "mean_diff": 0.0,
+      "diff_ci": [
+        0.0,
+        0.0
+      ],
+      "p_value": 1.0,
+      "adjusted_p": 1.0,
+      "significant": false,
+      "higher_is_better": true
+    },
+    {
+      "name": "unsafe_selection_rate",
+      "base_mean": 0.2857142857142857,
+      "lora_mean": 0.8571428571428571,
+      "base_ci": [
+        0.0,
+        0.5714285714285714
+      ],
+      "lora_ci": [
+        0.5714285714285714,
+        1.0
+      ],
+      "mean_diff": 0.5714285714285714,
+      "diff_ci": [
+        0.14285714285714285,
+        0.8571428571428571
+      ],
+      "p_value": 0.0036,
+      "adjusted_p": 0.0144,
+      "significant": true,
+      "higher_is_better": false
+    }
+  ]
+}

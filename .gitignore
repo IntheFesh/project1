@@ -42,3 +42,7 @@ milvus/
 .DS_Store
 .idea/
 .vscode/
+
+# Backups created during iterative patches
+*.bak
+*.bak[0-9]

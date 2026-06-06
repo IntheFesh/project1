@@ -92,9 +92,13 @@ def train(config_path: str = DEFAULT_CONFIG, data_path: str = DEFAULT_DATA) -> N
         learning_rate=train_cfg["learning_rate"],
         num_train_epochs=train_cfg["num_train_epochs"],
         warmup_ratio=train_cfg["warmup_ratio"],
-        max_seq_length=train_cfg["max_seq_len"],
+        max_length=train_cfg["max_seq_len"],
         bf16=train_cfg["bf16"],
         seed=train_cfg["seed"],
+        # F3: mask user/tool tokens from loss so the model is not trained to *memorize*
+        # tool returns (KB content). This addresses the grounding=0% under tool_choice=auto
+        # observed in stage-2 ablation.
+        assistant_only_loss=True,
     )
     trainer = SFTTrainer(model=model, args=sft_config, train_dataset=dataset, peft_config=peft_config)
     trainer.train()

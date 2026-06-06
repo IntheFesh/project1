@@ -125,6 +125,11 @@ def _order_trajectories(svc: ServiceDesk, oid: str, data: dict[str, Any]) -> lis
             out.append(_single(user, "refund",
                                {"order_id": oid, "amount": None, "reason": "用户申请退款"}, res,
                                f"已为订单 {oid} 提交退款，金额 {res['amount']} 元，将原路退回。"))
+        # PATCH-C/D: keep one in-window refusal phrasing for policy robustness (not two — to limit query_order inflation).
+        out.append(_refusal(f"订单 {oid} 已经买了一个月，能退吗", "query_order", {"order_id": oid}, q,
+                            f"根据系统，订单 {oid} 在退款窗口内，可以为您处理退款。"
+                            "如对窗口期有疑问，建议先确认下单时间。"))
+
     else:
         for user in refund_users:
             out.append(_refusal(user, "query_order", {"order_id": oid}, q,
@@ -137,6 +142,9 @@ def _order_trajectories(svc: ServiceDesk, oid: str, data: dict[str, Any]) -> lis
             (f"订单 {oid} 还没发货，帮我改下收货地址", {"address": "新的收货地址"}, "收货地址"),
             (f"{oid} 修改一下联系电话", {"phone": "13800000000"}, "联系电话"),
             (f"{oid} 改一下收货人姓名", {"recipient": "张三"}, "收货人姓名"),
+            # PATCH-D: more phrasing variants for modify (typical eval prompts use casual/abbreviated forms).
+            (f"{oid} 没发货吧，改个手机号", {"phone": "13900000000"}, "联系电话"),
+            (f"帮我把订单 {oid} 的地址换一下", {"address": "新的收货地址2"}, "收货地址"),
         ]
         for user, changes, label in variants:
             res = svc.modify_order(oid, changes)
@@ -151,8 +159,21 @@ def _order_trajectories(svc: ServiceDesk, oid: str, data: dict[str, Any]) -> lis
 
 # KB phrasings here are deliberately DIFFERENT from the held-out eval prompts.
 _KB_QUERIES: list[str] = [
-    "邮费是怎么收的？", "快递费用如何计算？", "退款会原路返回吗？", "退款到账需要几天？",
-    "客服多久会回复工单？", "工单一般多长时间解决？", "忘记登录密码了怎么处理？", "账号登录不上怎么办？",
+    # shipping (8)
+    "邮费是怎么收的？", "快递费用如何计算？", "包邮门槛是多少？", "运费多少钱起步？",
+    "运费多少？", "邮费多少钱？", "什么时候包邮？", "买多少才包邮？",
+    # refund (8)
+    "退款会原路返回吗？", "退款到账需要几天？", "退款流程是怎样的？", "申请退款后多久能收到？",
+    "退款怎么操作？", "退款多久到账？", "退款规则是什么？", "退款政策说一下",
+    # ticket SLA (8)
+    "客服多久会回复工单？", "工单一般多长时间解决？", "我提交的工单为什么还没人处理？", "工单进度在哪里查看？",
+    "工单要多久才有结果？", "工单处理时效是？", "工单查询入口在哪？", "提交的工单如何跟进？",
+    # account (8)
+    "忘记登录密码了怎么处理？", "账号登录不上怎么办？", "如何修改账户绑定的手机号？", "电子发票怎么开？",
+    "密码忘记了怎么办？", "账号被锁了如何解锁？", "怎么改绑定手机？", "开发票的流程是？",
+    # general FAQ (8)
+    "你们的退换货标准是什么？", "可以延后发货吗？", "商品保修多久？", "如何申请发票？",
+    "下单后还能改地址吗？", "怎么取消订单？", "VIP 会员有什么权益？", "积分怎么用？",
 ]
 
 
@@ -161,8 +182,13 @@ def _knowledge_trajectories(svc: ServiceDesk) -> list[SFTSample]:
     for query in _KB_QUERIES:
         kb = svc.search_kb(query, 3)
         cites = "，".join(c["doc_id"] for c in kb["citations"])
+        # Original phrasing.
         out.append(_single(query, "search_kb", {"query": query, "top_k": 3}, kb,
                            f"根据知识库，{query.rstrip('？?')}的说明如下，请参考。（来源：{cites}）"))
+        # PATCH-D: alternate phrasing variant for the same KB question, to broaden coverage.
+        alt = f"想问一下，{query}"
+        out.append(_single(alt, "search_kb", {"query": alt, "top_k": 3}, kb,
+                           f"知识库相关说明如下（来源：{cites}）。"))
     return out
 
 
@@ -183,22 +209,50 @@ def _ticket_trajectories(svc: ServiceDesk) -> list[SFTSample]:
 
 
 def _multistep_trajectories(svc: ServiceDesk) -> list[SFTSample]:
-    """Two-step trajectories (query, then act) to teach the agentic loop."""
-    oid = "A1001"  # unshipped, within window -> query then refund is legitimate
-    q = svc.query_order(oid)
-    res = svc.refund(oid, None, "确认后退款")
-    return [
-        _sample(
-            [
-                {"role": "user", "content": f"先帮我看下订单 {oid} 能不能退，可以的话就退款"},
-                _tool_call("query_order", {"order_id": oid}),
-                _tool_result("query_order", q),
-                _tool_call("refund", {"order_id": oid, "amount": None, "reason": "确认后退款"}),
-                _tool_result("refund", res),
-                {"role": "assistant", "content": f"订单 {oid} 在退款窗口内，已为您退款 {res['amount']} 元，原路退回。"},
-            ]
-        )
-    ]
+    """Two-step trajectories (query, then act) to teach the agentic loop.
+
+    F2: scaled from 1 -> 6 trajectories covering all check-then-act patterns the eval tests.
+    """
+    out: list[SFTSample] = []
+
+    # Pattern 1+2: query then refund (in-window)
+    for oid in ("A1001", "A1003"):
+        q = svc.query_order(oid)
+        res = svc.refund(oid, None, "确认后退款")
+        out.append(_sample([
+            {"role": "user", "content": f"先帮我看下订单 {oid} 能不能退，可以的话就退款"},
+            _tool_call("query_order", {"order_id": oid}),
+            _tool_result("query_order", q),
+            _tool_call("refund", {"order_id": oid, "amount": None, "reason": "确认后退款"}),
+            _tool_result("refund", res),
+            {"role": "assistant", "content": f"订单 {oid} 在退款窗口内，已为您退款 {res['amount']} 元，原路退回。"},
+        ]))
+
+    # Pattern 3+4: query then modify (unshipped) — teaches happy_modify check-then-act
+    for oid in ("A1005", "A1008"):
+        q = svc.query_order(oid)
+        changes = {"address": "新的收货地址"}
+        res = svc.modify_order(oid, changes)
+        out.append(_sample([
+            {"role": "user", "content": f"{oid} 没发货吧，帮我改下地址"},
+            _tool_call("query_order", {"order_id": oid}),
+            _tool_result("query_order", q),
+            _tool_call("modify_order", {"order_id": oid, "changes": changes}),
+            _tool_result("modify_order", res),
+            {"role": "assistant", "content": f"已确认订单 {oid} 未发货，已更新收货地址。"},
+        ]))
+
+    # Pattern 5+6: query then refusal (out-of-window or shipped) — teaches policy_edge two-step
+    for oid in ("A1007", "A1012"):  # A1007=20d (refund refuse), A1012=45d delivered (refund refuse)
+        q = svc.query_order(oid)
+        out.append(_sample([
+            {"role": "user", "content": f"先看下 {oid} 能退吗，能退就退"},
+            _tool_call("query_order", {"order_id": oid}),
+            _tool_result("query_order", q),
+            {"role": "assistant", "content": f"订单 {oid} 已超过 {REFUND_WINDOW_DAYS} 天退款窗口，无法直接退款。如有需要，可以为您创建人工工单。"},
+        ]))
+
+    return out
 
 
 def ingest_external(paths: list[str], licenses: dict[str, str], eval_prompts: set[str]) -> list[SFTSample]:

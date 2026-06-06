@@ -12,13 +12,13 @@ from serving.client import LLMClient
 def tool_select(state: AgentState, client: LLMClient) -> dict[str, Any]:
     """Select the next tool call; if the model answers directly, set final_answer.
 
-    Prior tool calls + results from this turn (``tool_history``) are appended so the model
-    conditions on what it has already observed — the basis for multi-step loops.
+    Honors per-turn ``tool_choice_override`` on state (set by the eval scorer to switch
+    between 'auto' and 'required' by task category); defaults to 'auto'.
     """
     messages = [m.model_dump(exclude_none=True) for m in state.messages] + state.tool_history
-    resp = client.chat(messages, tools=openai_tools(), tool_choice="auto", temperature=0.0)
+    tc = state.tool_choice_override or "auto"
+    resp = client.chat(messages, tools=openai_tools(), tool_choice=tc, temperature=0.0)
     if resp.tool_calls:
         call = resp.tool_calls[0]
         return {"selected_tool": ToolCall(name=call.name, arguments=call.arguments)}
-    # Model is done: clear the proposal so routing goes to the responder, not re-execution.
     return {"selected_tool": None, "final_answer": resp.content or ""}

@@ -53,7 +53,7 @@ def build_graph(
     client: LLMClient,
     services: ServiceDesk,
     checkpointer: Any | None = None,
-    max_steps: int = 1,
+    max_steps: int = 2,
 ) -> CompiledStateGraph:
     """Build and compile the agent graph with checkpointing.
 
@@ -91,12 +91,16 @@ def run_turn(
     services: ServiceDesk,
     thread_id: str = "default",
     graph: CompiledStateGraph | None = None,
-    max_steps: int = 1,
+    max_steps: int = 2,
+    tool_choice_override: str | None = None,
 ) -> AgentState:
     """Run one user turn through the graph and return the final ``AgentState``."""
     graph = graph or build_graph(client, services, max_steps=max_steps)
+    initial: dict[str, Any] = {"messages": [{"role": "user", "content": text}]}
+    if tool_choice_override is not None:
+        initial["tool_choice_override"] = tool_choice_override
     result = graph.invoke(
-        {"messages": [{"role": "user", "content": text}]},
+        initial,
         config={"configurable": {"thread_id": thread_id}},
     )
     return result if isinstance(result, AgentState) else AgentState.model_validate(result)

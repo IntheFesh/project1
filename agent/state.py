@@ -53,6 +53,8 @@ class AgentState(BaseModel):
     steps: int = 0
     tool_history: list[dict[str, Any]] = Field(default_factory=list)
     executed_tools: list[ToolCall] = Field(default_factory=list)
+    # Per-turn override for tool_choice ('auto' | 'required' | None). Set by eval scorer.
+    tool_choice_override: str | None = None
 
     @property
     def policy_ok(self) -> bool:
