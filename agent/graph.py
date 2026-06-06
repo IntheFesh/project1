@@ -35,12 +35,31 @@ def _route_after_select(state: AgentState) -> str:
     return "tool_executor" if state.selected_tool is not None else "responder"
 
 
+def _route_after_policy(state: AgentState, max_steps: int) -> str:
+    """Loop back for another tool while within budget; stop on a violation or the cap.
+
+    With ``max_steps == 1`` this always routes to the responder, preserving the original
+    single-tool-per-turn behavior. With ``max_steps > 1`` the agent may call another tool
+    after observing the result (multi-step agentic loop), unless policy blocked this step.
+    """
+    if state.violations:
+        return "responder"  # a violation stops the turn -> refuse
+    if state.steps >= max_steps:
+        return "responder"
+    return "tool_select"
+
+
 def build_graph(
     client: LLMClient,
     services: ServiceDesk,
     checkpointer: Any | None = None,
+    max_steps: int = 1,
 ) -> CompiledStateGraph:
-    """Build and compile the agent graph with checkpointing."""
+    """Build and compile the agent graph with checkpointing.
+
+    ``max_steps`` caps the number of tool calls per turn (1 = single-step; >1 enables the
+    multi-step loop needed for tau2-bench).
+    """
     builder = StateGraph(AgentState)
     builder.add_node("planner", planner)
     builder.add_node("tool_select", lambda s: tool_select(s, client))
@@ -56,7 +75,11 @@ def build_graph(
         {"tool_executor": "tool_executor", "responder": "responder"},
     )
     builder.add_edge("tool_executor", "policy_check")
-    builder.add_edge("policy_check", "responder")
+    builder.add_conditional_edges(
+        "policy_check",
+        lambda s: _route_after_policy(s, max_steps),
+        {"tool_select": "tool_select", "responder": "responder"},
+    )
     builder.add_edge("responder", END)
 
     return builder.compile(checkpointer=checkpointer or MemorySaver())
@@ -68,9 +91,10 @@ def run_turn(
     services: ServiceDesk,
     thread_id: str = "default",
     graph: CompiledStateGraph | None = None,
+    max_steps: int = 1,
 ) -> AgentState:
     """Run one user turn through the graph and return the final ``AgentState``."""
-    graph = graph or build_graph(client, services)
+    graph = graph or build_graph(client, services, max_steps=max_steps)
     result = graph.invoke(
         {"messages": [{"role": "user", "content": text}]},
         config={"configurable": {"thread_id": thread_id}},

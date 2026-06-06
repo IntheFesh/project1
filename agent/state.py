@@ -49,6 +49,10 @@ class AgentState(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     violations: list[PolicyViolation] = Field(default_factory=list)
     final_answer: str | None = None
+    # Multi-step loop bookkeeping (used when max_steps > 1; see agent/graph.py).
+    steps: int = 0
+    tool_history: list[dict[str, Any]] = Field(default_factory=list)
+    executed_tools: list[ToolCall] = Field(default_factory=list)
 
     @property
     def policy_ok(self) -> bool:

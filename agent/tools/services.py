@@ -13,6 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from agent.tools.order_data import all_orders
+
 
 class Order(BaseModel):
     """A sample order record."""
@@ -26,20 +28,8 @@ class Order(BaseModel):
 
 
 def _sample_orders() -> dict[str, Order]:
-    return {
-        "A1001": Order(
-            order_id="A1001", status="paid", amount=199.0,
-            days_since_purchase=2, shipped=False, items=["蓝牙耳机"],
-        ),
-        "A1002": Order(
-            order_id="A1002", status="shipped", amount=560.0,
-            days_since_purchase=4, shipped=True, items=["机械键盘"],
-        ),
-        "A1009": Order(
-            order_id="A1009", status="delivered", amount=88.0,
-            days_since_purchase=30, shipped=True, items=["数据线"],
-        ),
-    }
+    """Build Order objects from the union of the disjoint train + eval pools."""
+    return {oid: Order(order_id=oid, **data) for oid, data in all_orders().items()}
 
 
 KBSearch = Callable[[str, int], dict[str, Any]]

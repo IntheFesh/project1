@@ -55,7 +55,9 @@ def test_runners_smoke_works_and_real_run_is_guarded() -> None:
     summary = run_tau2.smoke(ScriptedLLMClient())
     assert summary.tool_accuracy == 1.0
     assert "synthetic" in summary.label
-    with pytest.raises(NotImplementedError):
+    # Without the external benchmark CLIs installed, run() must fail with an actionable
+    # error (pointing at eval/README.md), not silently or with a bare NotImplementedError.
+    with pytest.raises(RuntimeError, match="tau2 CLI not found"):
         run_tau2.run()
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(RuntimeError, match="BFCL CLI not found"):
         run_bfcl.run()

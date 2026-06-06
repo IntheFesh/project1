@@ -28,3 +28,8 @@ sampling:
   temperature: 0.0                   # greedy default -> deterministic CI gate
   top_p: 1.0
   max_tokens: 1024
+
+agent:
+  # 1 = single tool per turn (CI gate / zh service-desk / BFCL). Raise for multi-step
+  # agentic loops (tau2-bench): the model calls a tool, observes, then decides again.
+  max_steps: 1

@@ -21,4 +21,7 @@ def planner(state: AgentState) -> dict[str, Any]:
         "final_answer": None,
         "violations": [],
         "citations": [],
+        "steps": 0,
+        "tool_history": [],
+        "executed_tools": [],
     }

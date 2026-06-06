@@ -2,7 +2,7 @@
 
 ``dry_run`` validates the config + dataset off-GPU (no torch import). ``train`` runs the real
 job and lazily imports the CUDA stack — install ``requirements/train.txt`` on the Blackwell
-box (cu128) first. Defaults come from ``configs/lora.yaml`` (PRO 6000 -> LoRA + bf16).
+box (cu128) first. Defaults come from ``configs/lora.yaml`` (RTX 5090 -> QLoRA 4-bit).
 """
 
 from __future__ import annotations

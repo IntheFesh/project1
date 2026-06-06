@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from pydantic import ValidationError
@@ -26,14 +27,42 @@ def tool_executor(state: AgentState, client: LLMClient, services: ServiceDesk) -
         return {
             "selected_tool": tool,
             "tool_result": {"ok": False, "reason": "invalid_arguments"},
+            "steps": state.steps + 1,
         }
 
     result = execute(services, tool.name, tool.arguments)
-    updates: dict[str, Any] = {"selected_tool": tool, "tool_result": result}
+    updates: dict[str, Any] = {
+        "selected_tool": tool,
+        "tool_result": result,
+        "steps": state.steps + 1,
+        "executed_tools": [*state.executed_tools, tool],
+        "tool_history": [*state.tool_history, *_history_turn(tool, result)],
+    }
     citations = _citations_from(result)
     if citations:
         updates["citations"] = citations
     return updates
+
+
+def _history_turn(tool: ToolCall, result: dict[str, Any]) -> list[dict[str, Any]]:
+    """OpenAI-format (assistant tool_call, tool result) pair appended to the loop context."""
+    return [
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": f"call_{tool.name}_{id(tool)}",
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "arguments": json.dumps(tool.arguments, ensure_ascii=False),
+                    },
+                }
+            ],
+        },
+        {"role": "tool", "name": tool.name, "content": json.dumps(result, ensure_ascii=False)},
+    ]
 
 
 def _retry_invalid(state: AgentState, client: LLMClient, tool_name: str) -> ToolCall | None:

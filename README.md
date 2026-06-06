@@ -4,12 +4,15 @@
 Qwen3 · SGLang · LangGraph · LlamaIndex/Milvus · FastAPI · Langfuse · LoRA/QLoRA — with a
 statistics-first evaluation harness (τ²-bench, BFCL-V4, TruLens RAG-triad, bootstrap CIs, pass^k).
 
-> **Status.** Phases 0–8 are implemented and run **off-GPU today** with a deterministic dev
-> backend (100+ tests green): agent graph, 5 tools + policy checks, hybrid RAG, FastAPI + SSE,
-> Gradio UI, tracing, eval harness + deterministic CI gate, SFT data builder, LoRA dry-run,
-> Dockerfiles + one-command deploy. The **on-GPU steps** (live SGLang serving, real
-> τ²-bench/BFCL numbers, the actual LoRA/GRPO training) are runnable scripts executed on the
-> Blackwell box — their metrics stay **`TBD`** here. **No fabricated numbers, ever.**
+> **Status.** Implemented and running **off-GPU today** with a deterministic dev backend
+> (**127 tests green**): agent graph with a **multi-step tool loop**, 5 tools + policy checks,
+> hybrid RAG, FastAPI + SSE, Gradio UI, tracing, a **held-out Chinese service-desk benchmark
+> + scorer**, **train/eval data-leakage guards**, eval harness + deterministic CI gate, real
+> **BFCL-V4 / τ²-bench runners**, headline base-vs-+LoRA aggregation (bootstrap CIs + paired
+> tests + pass^k), SFT data builder, LoRA dry-run, Dockerfiles + one-command deploy. The
+> **on-GPU steps** (live SGLang serving, real τ²-bench/BFCL numbers, the actual QLoRA training)
+> are runnable scripts executed on the GPU box — their metrics stay **`TBD`** here.
+> **No fabricated numbers, ever.** See `report/improvement_plan.md` for the GPU runbook.
 
 ---
 
@@ -85,12 +88,16 @@ backend, so the whole system is demonstrable and testable without a GPU.
 
 | Card | Training default | Serving default | GRPO |
 | --- | --- | --- | --- |
-| RTX 5090 (32 GB) | QLoRA (4-bit) | AWQ / FP8 | out of scope (won't fit) |
-| **RTX PRO 6000 (96 GB)** | **LoRA + bf16** | **bf16** / FP8 | feasible (STRETCH) |
+| **RTX 5090 (32 GB)** | **QLoRA (4-bit)** | **bf16** (≈16 GB) / FP8 | out of scope (won't fit) |
+| RTX PRO 6000 (96 GB) | LoRA + bf16 | bf16 / FP8 | feasible (STRETCH) |
 
-**Default profile: RTX PRO 6000.** Both cards are Blackwell **sm_120 → CUDA 12.8+**. Do **not**
-use cu124/cu126 wheels (they fail with `no kernel image is available for execution on the
-device`). Serve via `lmsysorg/sglang:blackwell` with `--attention-backend flashinfer`.
+**Default profile: RTX 5090** (the project's actual target — rented on AutoDL, ≤5 GPU-days).
+QLoRA 4-bit fits training in 32 GB; the 8B serves in bf16. Both cards are Blackwell
+**sm_120 → CUDA 12.8+**. Do **not** use cu124/cu126 wheels (they fail with `no kernel image is
+available for execution on the device`). Serve via `lmsysorg/sglang:blackwell` with
+`--attention-backend flashinfer`. On AutoDL: `export HF_ENDPOINT=https://hf-mirror.com`, run the
+τ²-bench user-simulator on a cheap **external API** (keeps the 5090 for the model under test),
+and **power the instance off between runs** to save budget.
 
 ---
 
@@ -234,16 +241,32 @@ Docker, not pip. Optional extras: `ui`, `obs`, `eval`.
 Everything above is CORE and implemented. STRETCH (started only on request): LiteLLM gateway,
 GRPO training run, Next.js frontend, Prometheus+Grafana, K8s/Helm, Qwen3.5-9B comparison.
 
-## Results (TBD until real runs)
-Filled from real runs only, with **95% bootstrap CIs (≥10k resamples)**; latency on an
-**exclusive GPU**. (Off-GPU smoke validates the *pipeline*, not quality.)
+## What "SOTA" means here (honest framing)
+A Qwen3-8B + QLoRA system will **not** beat closed frontier models (GPT/Claude) on absolute
+benchmark scores, and this repo never claims it does. The defensible, still-strong targets:
+- **Standardized track** — *competitive among open models ≤10B* on **BFCL-V4** (AST accuracy)
+  and **τ²-bench** (pass^k), reported with **95% bootstrap CIs**, where **+QLoRA beats base by a
+  statistically significant margin** (paired bootstrap + Holm–Bonferroni).
+- **Self-built track** — **policy-violation rate → 0** (a hard, verifiable constraint; the
+  deterministic gate guarantees no forbidden action reaches the user), plus the *learning
+  signal* that QLoRA drives the model's **unsafe-tool-selection rate** toward zero.
 
-| Track | Benchmark / Metric | Base Qwen3-8B | + LoRA-SFT | Notes |
+**Data hygiene (no leakage).** SFT trains on the **A-series** order pool; the held-out
+benchmark uses a **disjoint E-series** pool, and `tests/test_leakage.py` fails CI if the two
+order pools or any prompts overlap. So reported accuracy can't be inflated by training on the
+eval set — the first thing a reviewer checks.
+
+## Results (TBD until real runs)
+Filled from real runs only, with **95% bootstrap CIs (≥10k resamples)** via `eval/results.py`;
+latency on an **exclusive GPU**. (Off-GPU smoke validates the *pipeline*, not quality.)
+
+| Track | Benchmark / Metric | Base Qwen3-8B | + QLoRA-SFT | Notes |
 | --- | --- | --- | --- | --- |
-| Tool-calling | τ²-bench retail · pass^1 / pass^4 | TBD | TBD | combinatorial pass^k |
-| Tool-calling | BFCL-V4 · AST accuracy | TBD | TBD | record V4 version |
-| Service-desk (zh) | tool accuracy | TBD | TBD | self-built domain |
-| Service-desk (zh) | policy-violation rate ↓ | TBD | TBD | any violation = FAILURE |
+| Tool-calling | τ²-bench retail · pass^1 / pass^4 | TBD | TBD | combinatorial pass^k + CI |
+| Tool-calling | BFCL-V4 · AST accuracy | TBD | TBD | record V4 commit |
+| Service-desk (zh) | success rate | TBD | TBD | held-out E-pool |
+| Service-desk (zh) | unsafe-selection rate ↓ | TBD | TBD | learning signal → 0 |
+| Service-desk (zh) | policy-violation rate (reaches user) | **0** | **0** | gate-guaranteed |
 | RAG | groundedness (TruLens) | TBD | TBD | RAG triad |
 | Serving | p50 / p95 latency | TBD | TBD | exclusive GPU only |
 
