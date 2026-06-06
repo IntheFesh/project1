@@ -1,7 +1,8 @@
 """LangGraph wiring: planner -> tool_select -> tool_executor -> policy_check -> responder.
 
 The graph uses ``AgentState`` (pydantic) as its schema and an injected LLM client +
-ServiceDesk, so the same graph runs against SGLang/vLLM/Ollama or the offline mock.
+ServiceDesk, so the same graph runs against vLLM (the engine used) / Ollama, or the
+offline deterministic mock.
 """
 
 from __future__ import annotations

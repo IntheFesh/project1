@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Launch SGLang (OpenAI-compatible) for Qwen3-8B on a Blackwell GPU (sm_120).
-# PRIMARY serving path. Prefer the prebuilt image to avoid JIT/PTX build breakage:
-#   lmsysorg/sglang:blackwell  (AOT-compiled sm_120 kernels)
+# REFERENCE ONLY — NOT used on the RTX 5090 (Blackwell sm_120). SGLang's sgl-kernel
+# (0.3.21) ships no sm120 build, so this path was abandoned; the project serves with
+# vLLM instead (serving/vllm_server.sh, BLACKWELL_NOTES.md). Kept for non-Blackwell use.
 #
-# Requires CUDA 12.8+. Do NOT use cu124/cu126 wheels on Blackwell — they only
-# compile up to sm_90 and fail at runtime with:
-#   "no kernel image is available for execution on the device".
+# Launch SGLang (OpenAI-compatible) for Qwen3-8B. Prefer the prebuilt image:
+#   lmsysorg/sglang:blackwell
 set -euo pipefail
 
 MODEL_PATH="${MODEL_ID:-Qwen/Qwen3-8B}"

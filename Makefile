@@ -2,7 +2,7 @@
 # Uses .RECIPEPREFIX = > so recipes don't depend on literal tabs.
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
-.PHONY: help setup lint test gate check demo ui sft dry-run up up-full down clean
+.PHONY: help setup lint test gate check demo ui sft dry-run train-lora eval-lora up up-full down clean
 
 help:  ## list targets
 >@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
@@ -32,6 +32,12 @@ sft:  ## build the Chinese SFT dataset
 
 dry-run:  ## validate LoRA config + data without a GPU
 >uv run python -m finetune.train_lora --dry-run
+
+train-lora:  ## QLoRA-SFT on the GPU box (cu130; see README/BLACKWELL_NOTES)
+>uv run python -m finetune.build_sft_data && uv run python -m finetune.train_lora
+
+eval-lora:  ## score the held-out benchmark against the served model (set SERVING_BACKEND/OPENAI_BASE_URL)
+>uv run python -m eval.zh_service_desk && uv run python -m eval.results
 
 up:  ## docker: app-only stack (off-GPU)
 >docker compose -f docker-compose.app.yml up --build

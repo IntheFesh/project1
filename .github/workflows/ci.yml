@@ -30,7 +30,7 @@ jobs:
 
       # Deterministic eval gate: fixed slice, greedy (temperature=0). Runs the mock
       # backend in CI so the decision is reproducible without a GPU; on the box it runs
-      # against SGLang. Headline multi-seed + bootstrap CIs are Phase 5/8, NOT this gate.
+      # against vLLM. Headline numbers use paired bootstrap + Holm (eval/results.py).
       - name: Eval gate (deterministic)
         run: uv run python -m eval.gate
 
