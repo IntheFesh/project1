@@ -1,10 +1,10 @@
-# PolicyArena — FULL stack (Blackwell GPU box). One command:
-#   cp .env.example .env && docker compose up --build
-# Needs an NVIDIA Blackwell GPU + the NVIDIA Container Toolkit (for the sglang service).
-# For an off-GPU app-only demo use docker-compose.app.yml instead.
+# PolicyArena — FULL stack (reference). NOTE: the `sglang` service below does NOT work on
+# Blackwell sm120 (sgl-kernel has no sm120 build); the reported run served with vLLM directly
+# (serving/vllm_server.sh, BLACKWELL_NOTES.md), not this compose. Kept for non-sm120 / reference
+# use. For an off-GPU app-only demo use docker-compose.app.yml instead.
 
 services:
-  # ---- Serving: SGLang (PRIMARY), OpenAI-compatible, Blackwell AOT kernels ----
+  # ---- Serving: SGLang (reference only; unused on Blackwell sm120 — see header) ----
   sglang:
     image: lmsysorg/sglang:blackwell
     shm_size: "16g"

@@ -37,7 +37,7 @@ def evaluate_tasks(
     records: list[EvalRecord] = []
     for i, task in enumerate(tasks):
         state = run_turn(task["prompt"], client, services, thread_id=f"eval-{i}")
-        tool = state.selected_tool
+        tool = state.acted_tool  # multi-step aware: selected_tool is None after the loop ends
         predicted = tool.name if tool else None
         args_valid = is_valid(tool.name, tool.arguments) if tool else True
         records.append(

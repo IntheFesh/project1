@@ -63,7 +63,7 @@ def _to_response(state: AgentState) -> QueryResponse:
     return QueryResponse(
         final_answer=state.final_answer,
         plan=state.plan,
-        tool=state.selected_tool.name if state.selected_tool else None,
+        tool=state.acted_tool.name if state.acted_tool else None,
         tool_result=state.tool_result,
         violations=[v.model_dump() for v in state.violations],
         citations=[c.model_dump() for c in state.citations],
@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
             user=message,
             thread_id=thread_id,
             plan=state.plan,
-            tool=state.selected_tool.name if state.selected_tool else None,
+            tool=state.acted_tool.name if state.acted_tool else None,
             policy_ok=state.policy_ok,
             violations=[v.rule_id for v in state.violations],
             citations=[c.doc_id for c in state.citations],
@@ -131,11 +131,12 @@ def create_app() -> FastAPI:
 
         async def events() -> Any:
             yield {"event": "plan", "data": state.plan or ""}
-            if state.selected_tool is not None:
+            acted = state.acted_tool
+            if acted is not None:
                 yield {
                     "event": "tool",
                     "data": json.dumps(
-                        {"name": state.selected_tool.name, "arguments": state.selected_tool.arguments},
+                        {"name": acted.name, "arguments": acted.arguments},
                         ensure_ascii=False,
                     ),
                 }

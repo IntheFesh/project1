@@ -1,9 +1,9 @@
 """OpenAI-compatible LLM client + a deterministic mock for off-GPU development.
 
-``OpenAICompatibleClient`` talks to SGLang / vLLM / Ollama purely by ``base_url``, so the
-same code path serves all three. ``ScriptedLLMClient`` is a deterministic, rule-based
-stand-in for tests and off-GPU demos — it is NOT a model, and its outputs must never be
-reported as model results.
+``OpenAICompatibleClient`` talks to any OpenAI-compatible server (vLLM — the engine used on
+Blackwell — or Ollama) purely by ``base_url``. ``ScriptedLLMClient`` is a deterministic,
+rule-based stand-in for tests and off-GPU demos — it is NOT a model, and its outputs must
+never be reported as model results.
 """
 
 from __future__ import annotations
@@ -189,17 +189,17 @@ class ScriptedLLMClient:
 def get_client(backend: str | None = None, settings: Settings | None = None) -> LLMClient:
     """Construct an LLM client for the configured backend.
 
-    ``backend`` is one of ``sglang`` (default), ``vllm``, ``ollama``, or ``mock``
-    (the deterministic offline stand-in). When omitted, uses ``SERVING_BACKEND``.
+    ``backend`` is one of ``vllm`` (default, used on Blackwell), ``ollama``, ``mock``
+    (the deterministic offline stand-in), or ``sglang`` (reference; unused on sm120).
+    When omitted, uses ``SERVING_BACKEND``.
     """
     s = settings or get_settings()
     name = (backend or s.serving_backend).lower()
     if name == "mock":
         return ScriptedLLMClient()
-    if name == "vllm":
-        return OpenAICompatibleClient(base_url=s.vllm_base_url, settings=s)
     if name == "ollama":
         return OpenAICompatibleClient(
             base_url=s.ollama_base_url, model=s.ollama_model, settings=s
         )
-    return OpenAICompatibleClient(settings=s)  # sglang (default)
+    # vllm (default) / sglang(reference) / any OpenAI-compatible endpoint by base_url
+    return OpenAICompatibleClient(settings=s)

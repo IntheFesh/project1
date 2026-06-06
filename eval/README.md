@@ -18,14 +18,14 @@ Holm–Bonferroni corrected (`eval/results.py`). Off-GPU `smoke()` paths validat
 
 ```bash
 export HF_ENDPOINT=https://hf-mirror.com          # AutoDL: HF mirror
-bash serving/sglang_server.sh                      # base Qwen3-8B on :30000
+bash serving/vllm_server.sh                        # base Qwen3-8B on :30000 (vLLM)
 # +LoRA: serve with the adapter (see serving notes), or merge then serve.
 ```
 
 ## 1. Self-built Chinese service-desk (P0)
 
 ```bash
-SERVING_BACKEND=sglang OPENAI_BASE_URL=http://localhost:30000/v1 \
+SERVING_BACKEND=vllm OPENAI_BASE_URL=http://localhost:30000/v1 \
   python -m eval.zh_service_desk            # prints success/tool/grounding + policy metrics
 ```
 Run once against the **base** model and once against **+LoRA**; feed the per-task
@@ -87,4 +87,4 @@ serving config (bf16 vs fp8). Power the AutoDL instance **off** between runs to 
 ## Version pinning
 
 Record exact commits/versions in `report/technical_report.md` §8:
-BFCL-V4 (`bfcl-eval==<ver>` or commit), τ²-bench commit, Qwen3-8B revision, torch cu128.
+BFCL-V4 (`bfcl-eval==<ver>` or commit), τ²-bench commit, Qwen3-8B revision, torch 2.11+cu130.

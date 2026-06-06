@@ -1,295 +1,291 @@
 # PolicyArena
 
-**A production-style, policy-compliant tool-calling + RAG agent platform.**
-Qwen3 · SGLang · LangGraph · LlamaIndex/Milvus · FastAPI · Langfuse · LoRA/QLoRA — with a
-statistics-first evaluation harness (τ²-bench, BFCL-V4, TruLens RAG-triad, bootstrap CIs, pass^k).
+**A statistically-validated, policy-compliant tool-calling + RAG agent for a Chinese
+enterprise service desk.**
+Qwen3-8B · vLLM · LangGraph (multi-step loop) · hybrid RAG · QLoRA-SFT · a statistics-first
+evaluation harness (paired bootstrap + Holm–Bonferroni, pass^k).
 
-> **Status.** Implemented and running **off-GPU today** with a deterministic dev backend
-> (**127 tests green**): agent graph with a **multi-step tool loop**, 5 tools + policy checks,
-> hybrid RAG, FastAPI + SSE, Gradio UI, tracing, a **held-out Chinese service-desk benchmark
-> + scorer**, **train/eval data-leakage guards**, eval harness + deterministic CI gate, real
-> **BFCL-V4 / τ²-bench runners**, headline base-vs-+LoRA aggregation (bootstrap CIs + paired
-> tests + pass^k), SFT data builder, LoRA dry-run, Dockerfiles + one-command deploy. The
-> **on-GPU steps** (live SGLang serving, real τ²-bench/BFCL numbers, the actual QLoRA training)
-> are runnable scripts executed on the GPU box — their metrics stay **`TBD`** here.
-> **No fabricated numbers, ever.** See `report/improvement_plan.md` for the GPU runbook.
+[![CI](https://github.com/IntheFesh/project1/actions/workflows/ci.yml/badge.svg)](https://github.com/IntheFesh/project1/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
----
-
-## 🚀 Quickstart (one command)
-
-```bash
-# Off-GPU, no Docker — install, verify, and launch the API (deterministic mock backend):
-./scripts/quickstart.sh
-#   -> uv sync -> ruff -> pytest -> eval gate -> API on http://localhost:8000
-
-# Off-GPU, with Docker — API (:8000) + Gradio UI (:7860), no GPU needed:
-./scripts/deploy.sh            # == docker compose -f docker-compose.app.yml up --build
-
-# Full stack on a Blackwell GPU box (SGLang + Milvus + Langfuse + API + UI):
-cp .env.example .env && ./scripts/deploy.sh full
-```
-
-Or use `make`: `make check` (lint+test+gate) · `make demo` (API) · `make ui` · `make up` (Docker).
+> **What this is.** An agent that resolves enterprise service-desk requests by calling tools
+> **while obeying written policy** — refunding past the 7-day window or editing a shipped order
+> is scored as a hard **failure**, not a style nit. The contribution is deliberately not a new
+> method: it is a clean, reproducible engineering + evaluation pipeline with statistical rigour,
+> and an honest failure analysis surfaced by the evaluation itself. **Every number below is from
+> a real run and is reproducible from the code + the saved `results/*.json`. No fabricated
+> metrics.**
 
 ---
 
-## What it is
+## Latest results — June 2026, RTX 5090 (Blackwell, 32 GB)
 
-An agent that selects and calls tools to resolve enterprise service-desk requests **while
-respecting written policy**. An answer that violates a policy (e.g. refunding past the window)
-is scored as a **FAILURE**, not a style nit. Two domains:
+Held-out Chinese service-desk benchmark (**n = 32**, disjoint from training), QLoRA-SFT vs the
+base Qwen3-8B, **paired bootstrap (10 000 resamples) with Holm–Bonferroni** correction across the
+four comparisons. Full breakdown: [`report/case_study.md`](report/case_study.md); raw records:
+[`results/`](results/).
 
-1. **Standardized eval** — τ²-bench (retail/knowledge) + BFCL-V4.
-2. **A self-built Chinese “企业服务台” (enterprise service desk)** — policy docs (refund /
-   modify / SLA), five tools (`query_order`, `modify_order`, `refund`, `create_ticket`,
-   `search_kb`), and a small FAQ KB, trained on **real Chinese tool-calling trajectories**.
+| Metric (held-out, n=32) | Base | +QLoRA | Δ [95 % CI] | adj. p | sig. |
+| --- | ---: | ---: | --- | ---: | :---: |
+| **success_rate** | 53.1 % | **96.9 %** | +43.8 pp [+28.1, +59.4] | **<0.001** | ✅ |
+| **grounding_rate** | 25.0 % | **87.5 %** | +62.5 pp [+25.0, +87.5] | **0.005** | ✅ |
+| tool_accuracy | 28.6 % | 95.2 % | +66.6 pp | — | — |
+| args_match_rate | 33.3 % | 88.9 % | +55.6 pp | — | — |
+| negative_handling_rate | 100 % | 100 % | 0 | 1.000 | · (ceiling) |
+| unsafe_selection_rate (↓ better) | 28.6 % | 71.4 % | +42.9 pp [+14.3, +85.7] | 0.072 | · **(regression — see below)** |
+| **policy_violation_rate** (reaches user) | **0 %** | **0 %** | 0 | — | gate-guaranteed |
+
+**Two statistically significant gains** (success +43.8 pp, grounding +62.5 pp) survive
+multiple-comparison correction. **Zero policy violations** across *every* run — a deterministic
+policy gate intercepts every forbidden action regardless of the model's intent.
+
+**Honest caveat — a documented regression.** `unsafe_selection_rate` *rose* 28.6 % → 71.4 %
+(p = 0.072, **not** significant). It is operationally harmless — the gate keeps
+`policy_violation_rate` at **0 %** — and a large part of it is a *stricter* measurement (we now
+flag the forbidden tool if it appears at **any** step, catching the SFT-taught "check-then-act"
+pattern), with the remainder attributable to over-fitting on a 240-sample SFT set (final train
+loss ≈ 0.003). Full root-cause in [§ Findings](#findings--failure-analysis). Burying it would
+defeat the purpose of this project.
+
+> **Not yet run (future work, not claimed):** τ²-bench, BFCL-V4, and TruLens RAG-triad. No
+> public-leaderboard number is presented. The current claim is **statistically validated
+> within-domain improvement with zero policy violations**, not leaderboard SOTA.
+
+---
+
+## Problem
+
+Customer-service agents must not only pick the right tool — they must **obey written policy**.
+PolicyArena models a Chinese 企业服务台 (enterprise service desk) with five tools
+(`query_order`, `modify_order`, `refund`, `create_ticket`, `search_kb`), policy documents
+(refund window / modify-after-ship / SLA), and a small FAQ knowledge base. The question it asks:
+
+> Can a small open Chinese model be made both **capable** (high tool-selection accuracy and
+> grounding) and **safe** (zero policy violations reaching the user), with the gains validated by
+> proper paired statistics?
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  U[User] --> API[FastAPI + SSE / auth / rate-limit]
+  U[User] --> API[FastAPI + SSE / bearer auth / rate-limit]
   API --> G{LangGraph state machine}
   G --> P[planner] --> TS[tool_select] --> TE[tool_executor] --> PC[policy_check] --> R[responder]
+  PC -. loop: max_steps=2 .-> TS
   TS -. no tool .-> R
-  TE -- search_kb --> RAG[(RAG: bge hybrid + rerank)]
-  RAG --> MV[(Milvus / in-memory)]
-  TE --> LLM[OpenAI-compatible API: SGLang / vLLM / Ollama / mock]
+  TE -- search_kb --> RAG[(in-memory hybrid RAG: BM25 + dense + RRF + rerank)]
+  TE --> LLM[OpenAI-compatible API: vLLM base / +LoRA / mock]
   PC --> POL[(policy rules + docs)]
   R --> API
-  G -. traces .-> LF[(Langfuse)]
 ```
 
-The same graph runs against **SGLang/vLLM/Ollama** (by `base_url`) or a deterministic **mock**
-backend, so the whole system is demonstrable and testable without a GPU.
+- **Agent** — a LangGraph state machine with a **multi-step loop** (`max_steps=2`): call a tool,
+  observe the result, decide again. A **deterministic policy gate** (`policy_check`) sits inside
+  the loop — a forbidden action is blocked and refused, so it **never reaches the user**.
+- **RAG** — hybrid retrieval (dense + Okapi BM25 → reciprocal-rank fusion → rerank) over a Chinese
+  FAQ KB returns **cited** answers. *As-run* uses an in-memory hashed-embedding index; production
+  swaps in `bge-m3` + a cross-encoder reranker (`rag/embeddings.py`, `rag/rerank.py`).
+- **Serving** — one OpenAI-compatible client drives **vLLM** (the engine actually used on
+  Blackwell), or a deterministic **mock** (`ScriptedLLMClient`) so the whole system runs and is
+  tested without a GPU.
+- **Training** — **QLoRA-SFT** (4-bit, fits a 32 GB RTX 5090) on policy-aware Chinese
+  trajectories that teach correct tool calls *and* **policy-compliant refusals** (check, then
+  refuse — never call the forbidden tool).
 
-## Repo layout
+> **Why vLLM, not SGLang.** SGLang was attempted and abandoned on Blackwell: `sgl-kernel` 0.3.21
+> ships only sm90/sm100 kernels, with no sm120 build as of 2026-06. vLLM 0.22.1 has mature sm120
+> support. See [`BLACKWELL_NOTES.md`](BLACKWELL_NOTES.md).
+
+## Repository layout
 
 ```
 .
-├── scripts/      quickstart.sh  deploy.sh        # one-command run / deploy
-├── Makefile  Dockerfile  docker-compose.yml  docker-compose.app.yml
-├── agent/        graph.py state.py  nodes/  tools/{schemas,registry,services}  policies/
-├── rag/          text embeddings ingest index retrieve rerank pipeline  sample_kb/*.md
-├── serving/      client.py  sglang_server.sh  vllm_server.sh  litellm_config.yaml
-├── api/          main.py  auth.py  ratelimit.py
-├── frontend/     app.py  Dockerfile
-├── finetune/     build_sft_data.py  train_lora.py  train_grpo.py
-├── eval/         metrics harness tasks stats report gate  passk bootstrap run_tau2 run_bfcl rag_triad
-├── observability/ tracing.py  prompts.py
-├── common/       config.py        # env Settings + typed YAML loaders
-├── configs/      model lora retrieval server eval (.yaml)
-├── requirements/ train.txt rag.txt eval.txt   # heavy / CUDA stacks for the GPU box
-├── tests/        (100+ tests)     report/  .github/workflows/ci.yml
+├── agent/          graph.py state.py  nodes/  tools/{schemas,registry,services,order_data}  policies/
+├── rag/            text embeddings ingest index retrieve rerank pipeline  sample_kb/*.md
+├── serving/        client.py  vllm_server.sh  sglang_server.sh(*) litellm_config.yaml
+├── api/            main.py  auth.py  ratelimit.py        # FastAPI + SSE, bearer auth, rate limit
+├── frontend/       app.py  Dockerfile                    # Gradio demo UI
+├── finetune/       build_sft_data.py  train_lora.py  train_grpo.py
+├── eval/           zh_service_desk.py  harness  metrics  results  stats  bootstrap  passk
+│                   gate  run_tau2 run_bfcl(**) rag_triad  datasets/zh_service_desk_eval.jsonl
+├── results/        zh_base_final_detailed.json  zh_lora_final_detailed.json  zh_paired_final.{json,md}  …
+├── report/         case_study.md  one_pager.md  technical_report.md  resume_bullets.md
+├── docs/           AUDIT.md                                # claim audit
+├── common/         config.py            # typed YAML loaders + env Settings
+├── configs/        model lora retrieval server eval (.yaml)
+├── requirements/   train.txt rag.txt eval.txt             # heavy / CUDA stacks for the GPU box
+├── tests/          128 tests             scripts/  Makefile  Dockerfile  docker-compose*.yml
+└── BLACKWELL_NOTES.md                                     # the working cu130 + vLLM stack
 ```
+(*) `sglang_server.sh` is kept for reference but **was not used on Blackwell** (see above).
+(**) `run_tau2.py` / `run_bfcl.py` are wired runners for **future** external-benchmark runs.
 
-## Hardware & CUDA (Blackwell)
+## Quickstart (off-GPU, no GPU required)
 
-| Card | Training default | Serving default | GRPO |
-| --- | --- | --- | --- |
-| **RTX 5090 (32 GB)** | **QLoRA (4-bit)** | **bf16** (≈16 GB) / FP8 | out of scope (won't fit) |
-| RTX PRO 6000 (96 GB) | LoRA + bf16 | bf16 / FP8 | feasible (STRETCH) |
+The deterministic mock backend exercises the whole agent — graph, tools, policy gate, RAG,
+API — without a model:
 
-**Default profile: RTX 5090** (the project's actual target — rented on AutoDL, ≤5 GPU-days).
-QLoRA 4-bit fits training in 32 GB; the 8B serves in bf16. Both cards are Blackwell
-**sm_120 → CUDA 12.8+**. Do **not** use cu124/cu126 wheels (they fail with `no kernel image is
-available for execution on the device`). Serve via `lmsysorg/sglang:blackwell` with
-`--attention-backend flashinfer`. On AutoDL: `export HF_ENDPOINT=https://hf-mirror.com`, run the
-τ²-bench user-simulator on a cheap **external API** (keeps the 5090 for the model under test),
-and **power the instance off between runs** to save budget.
-
----
-
-# Installation
-
-### Prerequisites
-- **uv** + **Python 3.11**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- **Docker** (for the Docker deploy / full stack).
-- A **Blackwell GPU + NVIDIA Container Toolkit** for the on-GPU steps only.
-
-### A) Off-GPU dev (everything except live serving / training / real evals)
 ```bash
-git clone https://github.com/IntheFesh/project1.git policyarena && cd policyarena
-uv sync                       # light, GPU-free runtime + dev tools
-uv sync --extra ui            # + Gradio demo UI   (optional)
-uv sync --extra obs           # + Langfuse client  (optional)
-cp .env.example .env          # then edit .env (never commit it)
+uv sync
+make check            # ruff + 128 tests + deterministic eval gate  ->  [eval-gate] PASS
+make demo             # FastAPI on http://localhost:8000 (SERVING_BACKEND=mock)
 ```
 
-### B) Blackwell GPU box (adds CUDA stacks; not in the uv lock)
-```bash
-uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-python -c "import torch; print(torch.cuda.get_arch_list())"   # must contain 'sm_120'
-uv pip install -r requirements/train.txt      # transformers, peft, trl, bitsandbytes
-uv pip install -r requirements/rag.txt        # llama-index, pymilvus, bge (FlagEmbedding)
-uv pip install -r requirements/eval.txt       # trulens-eval; tau2-bench / BFCL per their READMEs
-```
+Talk to it (note the policy gate refusing an out-of-window refund):
 
----
-
-# Tutorial (教学指导)
-
-A step-by-step walkthrough from zero to a running, policy-aware agent.
-
-### Step 1 — Run it off-GPU and read the output
-```bash
-./scripts/quickstart.sh
-```
-This runs `uv sync`, lint, the 100+ tests, the deterministic eval gate (prints
-`[eval-gate] PASS ...`), then serves the API on `:8000` with `SERVING_BACKEND=mock`. The mock is
-a **rule-based stand-in, not a model** — it lets you exercise the whole agent without a GPU.
-
-### Step 2 — Talk to the agent (and watch policy enforcement)
-In another terminal:
 ```bash
 TOKEN=dev-token
-# (a) allowed refund — order A1001 is 2 days old:
 curl -s -X POST localhost:8000/agent/query -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" -d '{"message":"订单 A1001 我要退款"}'
-# (b) BLOCKED refund — order A1009 is 30 days old (> 7-day window):
+  -H "Content-Type: application/json" -d '{"message":"订单 A1001 我要退款"}'   # allowed (2 days old)
 curl -s -X POST localhost:8000/agent/query -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" -d '{"message":"订单 A1009 我要退款"}'
-# (c) grounded, cited knowledge answer:
-curl -s -X POST localhost:8000/agent/query -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" -d '{"message":"请问运费是怎么计算的？"}'
+  -H "Content-Type: application/json" -d '{"message":"订单 A1009 我要退款"}'   # BLOCKED (30 days old)
 ```
-Each response includes the trace: `plan`, the chosen `tool`, the `tool_result`, any policy
-`violations`, and `citations`. In (b) you'll see `violations:[{"rule_id":"refund_window",...}]`
-and a polite refusal — **a policy violation is a FAILURE the agent refuses, not performs.**
-The streaming variant: `curl -N -X POST localhost:8000/agent/stream ...` (SSE: plan → tool →
-result → final). Requests without a valid `Authorization: Bearer` token return `401`.
 
-### Step 3 — The chat UI
+The mock is a rule-based stand-in, **not a model** — its outputs are never reported as results.
+
+## Reproduce the headline numbers (RTX 5090, Blackwell sm120)
+
+Pinned working stack (see [`BLACKWELL_NOTES.md`](BLACKWELL_NOTES.md)): **PyTorch 2.11+cu130 ·
+vLLM 0.22.1 · trl 1.5.1 · bitsandbytes 0.49.2 · flashinfer 0.6.11.post2+cu130**. Use the **cu130**
+index — cu124/cu126/cu128 wheels do **not** provide working sm120 kernels here.
+
 ```bash
-make ui          # uv sync --extra ui + launch Gradio on http://localhost:7860 (mock backend)
-```
-The UI shows the live tool call + policy trace next to the answer. State lives in server memory
-(no browser storage).
+# 0) deps (GPU box). cu130 torch FIRST, then the training/eval stacks.
+uv pip install torch --index-url https://download.pytorch.org/whl/cu130
+uv pip install -r requirements/train.txt -r requirements/rag.txt
+export LD_LIBRARY_PATH=$(python -c "import nvidia.nvjitlink,os;print(os.path.dirname(nvidia.nvjitlink.__file__)+'/lib')"):$LD_LIBRARY_PATH  # libnvJitLink.so.13
 
-### Step 4 — Containerized deploy (off-GPU)
+# 1) build the SFT dataset (240 trajectories, A-series train pool only)
+uv run python -m finetune.build_sft_data
+
+# 2) QLoRA-SFT  (r=16, α=32, 4-bit NF4, assistant_only_loss; ~193 s on one 5090)
+uv run python -m finetune.train_lora            # adapter (~87 MB) -> outputs/adapters/…
+
+# 3) serve base and +LoRA with vLLM (sampler env bypasses flashinfer's sm120 arch bug)
+VLLM_USE_FLASHINFER_SAMPLER=0 uv run vllm serve Qwen/Qwen3-8B \
+  --host 0.0.0.0 --port 30000 --enable-auto-tool-choice --tool-call-parser hermes \
+  --reasoning-parser qwen3 --gpu-memory-utilization 0.85 --max-model-len 8192 \
+  --generation-config vllm                      # add: --enable-lora --lora-modules pa=outputs/adapters/…
+
+# 4) score the held-out benchmark (base, then +LoRA) and run the paired comparison
+SERVING_BACKEND=vllm OPENAI_BASE_URL=http://localhost:30000/v1 \
+  uv run python -m eval.zh_service_desk         # -> results/zh_*_detailed.json
+uv run python -m eval.results                   # paired bootstrap + Holm -> results/zh_paired_final.{json,md}
+```
+
+`--generation-config vllm` is required, or Qwen3's packaged config forces `temperature=0.6` and
+breaks deterministic, greedy evaluation.
+
+## Evaluation methodology
+
+The held-out set (`eval/datasets/zh_service_desk_eval.jsonl`, **E-series** order ids only) has
+four task categories with gold labels: **happy** (a tool must be called correctly), **policy_edge**
+(a forbidden action must be refused), **grounding** (the answer must cite the right KB doc), and
+**negative** (out-of-scope input must *not* trigger a tool). Scoring (`eval/zh_service_desk.py`)
+reports, for `success_rate`:
+
+$$\text{success\_rate} = \frac{1}{N}\sum_{i=1}^{N} \mathbb{1}\!\left[\text{task } i \text{ passed its category check}\right]$$
+
+Safety is decomposed into two distinct quantities most leaderboards collapse:
+
+$$\text{policy\_violation\_rate} = \Pr[\text{a forbidden action reaches the user}] = 0 \quad\text{(gate-guaranteed)}$$
+
+$$\text{unsafe\_selection\_rate} = \Pr[\text{the model itself attempts the forbidden tool at any step}]$$
+
+Comparisons use a **paired bootstrap** (10 000 resamples) for the Δ and its 95 % CI, with
+**Holm–Bonferroni** step-down correction across the four metrics (`eval/stats.py`,
+`eval/results.py`); tool-calling uses the unbiased **pass^k** estimator
+$\mathbb{E}\big[\binom{c}{k}/\binom{n}{k}\big]$ (`eval/passk.py`). Two production-relevant routing
+choices are applied per category: `tool_choice="required"` for happy/grounding, `"auto"` for
+policy_edge/negative; and `max_steps=2` so the SFT-taught *check-then-act* pattern is scored
+correctly (see Findings).
+
+**Data hygiene, enforced by CI.** SFT trains on the **A-series** order pool; the benchmark uses a
+**disjoint E-series** pool. [`tests/test_leakage.py`](tests/test_leakage.py) fails the build if the
+two pools — or any prompts — overlap. So accuracy cannot be inflated by training on the eval set.
+
+## Findings & failure analysis
+
+**The training-data-scarcity U-shape.** Across five configurations, `success_rate` traces an
+inverted U — the textbook under/over-fit trade-off on a small SFT set — bottoming at a 72-step
+over-trained collapse before the final, balanced 240×4 run recovers to 96.9 %. (Early rows were
+measured under a *less strict* protocol; the protocol fixes below are what make the final columns
+comparable.) Full table in [`report/case_study.md`](report/case_study.md).
+
+**Three evaluation-protocol findings** (documented in code — of more practical value to a
+deploying engineer than the headline number):
+
+1. **`tool_choice` is not a free binary.** With `"auto"`, the SFT model stopped calling
+   `search_kb` (it had internalised KB content) → grounding collapsed to 0 %; with `"required"`,
+   grounding recovered but negative-handling collapsed (the model fabricates a tool call for
+   out-of-scope input). **Fix: task-aware routing** (`agent/nodes/tool_select.py`).
+2. **`max_steps=1` mis-scores "check-then-act."** The SFT data teaches verify (`query_order`)
+   before mutate (`refund`/`modify`); single-step evaluation scored the verification call as a
+   wrong tool. **`max_steps=2` lifted `success_rate` +18.8 pp on the same adapter** — a protocol
+   bug, not a model change (`agent/graph.py`).
+3. **`assistant_only_loss` matters more than data balance.** Full-sequence SFT loss taught the
+   model to memorise tool-return (KB) text, defeating retrieval; `assistant_only_loss=True`
+   recovered grounding (`finetune/train_lora.py`).
+
+**The `unsafe_selection_rate` regression (28.6 → 71.4 %, p = 0.072, n.s.).** Three causes: (1) a
+**stricter detector** that flags the forbidden tool at *any* step, now correctly catching the
+check-then-act attempt the gate blocks; (2) the SFT data teaching check-then-attempt on borderline
+phrasings; (3) **over-fitting** on 240 samples × 4 epochs (train loss ≈ 0.003). Regularisation
+(fewer epochs, lower lr, higher dropout) degraded *both* success and safety — i.e. under-fit
+without recovering policy awareness — so the real fix is **1–3 orders of magnitude more SFT data**
+(`finetune/build_sft_data.py::ingest_external`). **The gate keeps `policy_violation_rate` at 0 %
+through every run**: the unsafe selection is a model-internal disposition, made harmless by
+defence in depth.
+
+## Honest limitations
+
+- **n = 32, self-built.** Wide CIs (base `success_rate` 95 % CI [0.344, 0.688], ±17 pp); read the
+  point estimates with that in mind. No public-leaderboard comparison is made.
+- **No τ²-bench / BFCL-V4 / TruLens run yet.** Comparable open ≤10B models (e.g. ToolACE-2-8B
+  ≈ 68.7 % on BFCL-V4) trained on 30 k+ trajectories; this used 240. Running BFCL on this adapter
+  is planned and may show negative transfer (BFCL is English, generic-domain).
+- **RAG is a hashed-embedding stand-in** off the GPU box; production swaps in `bge-m3` + reranker.
+- **The unsafe-selection regression is real if benign** (above).
+- **No RL.** A single 32 GB 5090 cannot fit GRPO rollout + training; GRPO is future work.
+
+## Roadmap (future work — not done)
+
+- [ ] **Scale SFT to ≈10 k** via licensed external corpora (ToolACE / APIGen-MT / xLAM zh subsets)
+      — the principled fix for the unsafe-selection regression.
+- [ ] **Run BFCL-V4** for a leaderboard-comparable, honest external number.
+- [ ] **τ²-bench retail** multi-turn evaluation (user-simulator on an external API).
+- [ ] **`bge-m3` + cross-encoder rerank** to close the one grounding failure.
+- [ ] **GRPO** with verifiable rewards (needs a larger-memory card).
+
+## Troubleshooting (Blackwell sm120 / cu130)
+
+- **`no kernel image is available for execution on the device`** → you installed cu124/cu126/cu128
+  torch. Reinstall from the **cu130** index.
+- **`libnvJitLink.so.13: cannot open shared object file`** → add the `nvidia/nvjitlink/lib` dir to
+  `LD_LIBRARY_PATH` (see the reproduce block).
+- **SGLang won't start on the 5090** → `sgl-kernel` has no sm120 build; use vLLM.
+- **flashinfer import/JIT errors** → `flashinfer-jit-cache` must match the `flashinfer` version;
+  and set `VLLM_USE_FLASHINFER_SAMPLER=0` (its sampler mis-detects sm120).
+- **Eval is non-deterministic / temperature ≠ 0** → pass `--generation-config vllm`; Qwen3's
+  packaged generation config otherwise forces `temperature=0.6`.
+- **`SFTConfig got an unexpected keyword argument 'max_seq_length'`** → trl 1.5.1 renamed it to
+  `max_length`.
+- **`401` from `/agent/query`** → add `-H "Authorization: Bearer <API_AUTH_TOKEN>"` (default
+  `dev-token`). **Off-GPU hangs** → set `SERVING_BACKEND=mock`.
+
+## Testing & CI
+
 ```bash
-./scripts/deploy.sh            # builds + runs agent-api (:8000) and frontend (:7860), mock backend
-# stop:
-./scripts/deploy.sh down
+make check     # ruff + pytest (128 tests) + deterministic eval gate
 ```
+GitHub Actions (`.github/workflows/ci.yml`) runs ruff → pytest → the deterministic eval gate →
+app image build on every commit, including the **data-leakage** guards.
 
-### Step 5 — Serve the real model (Blackwell GPU box)
-```bash
-bash serving/sglang_server.sh   # SGLang via lmsysorg/sglang:blackwell, OpenAI API on :30000
-# verify a tool call + forced tool_choice (xgrammar):
-curl -s localhost:30000/v1/chat/completions -H "Content-Type: application/json" -d '{
-  "model":"Qwen/Qwen3-8B",
-  "messages":[{"role":"user","content":"查询订单 A1001 的状态"}],
-  "tools":[{"type":"function","function":{"name":"query_order",
-    "parameters":{"type":"object","properties":{"order_id":{"type":"string"}},"required":["order_id"]}}}],
-  "tool_choice":"required"}'
-```
-Point the app at it (in `.env`): `SERVING_BACKEND=sglang`, `OPENAI_BASE_URL=http://localhost:30000/v1`.
-Alternatives: `bash serving/vllm_server.sh`, or Ollama for laptops:
-`ollama serve & ollama pull qwen3:8b` then `SERVING_BACKEND=ollama`.
+## License & citation
 
-### Step 6 — Fine-tuning
-```bash
-uv run python -m finetune.build_sft_data                # build Chinese SFT trajectories (JSONL)
-uv run python -m finetune.train_lora --dry-run          # validate config + data (off-GPU)
-uv run python -m finetune.train_lora                    # real run (GPU box; requirements/train.txt)
-# GRPO is STRETCH (PRO 6000 only) — ask before running.
-```
+[MIT](LICENSE). If you use this work, see [`CITATION.cff`](CITATION.cff). Frontends keep state in
+app/server memory only (no browser storage).
 
-### Step 7 — Evaluation
-```bash
-# off-GPU pipeline smoke (NOT a benchmark; validates the harness):
-uv run python -c "from eval.run_tau2 import smoke; from serving.client import ScriptedLLMClient; print(smoke(ScriptedLLMClient()).model_dump())"
-# real benchmarks on the GPU box: eval/run_tau2.run(...), eval/run_bfcl.run(...).
-# headline numbers: bootstrap 95% CIs (eval/bootstrap.py) + pass^k (eval/passk.py) +
-# paired bootstrap / Holm-Bonferroni (eval/stats.py). Latency p50/p95 on an EXCLUSIVE GPU.
-```
-
-### Step 8 — Full stack + Langfuse (GPU box)
-```bash
-cp .env.example .env          # set LANGFUSE_*, HF_TOKEN, API_AUTH_TOKEN
-./scripts/deploy.sh full      # sglang + milvus(+etcd/minio) + langfuse(+postgres) + api + ui
-# API :8000 · UI :7860 · Langfuse :3000 · SGLang :30000 · Milvus :19530
-```
-
----
-
-## Command reference
-
-| `make` | does |
-| --- | --- |
-| `make setup` | `uv sync` |
-| `make check` | lint + tests + eval gate |
-| `make demo` / `make ui` | run API / Gradio UI (mock) |
-| `make sft` / `make dry-run` | build SFT data / validate LoRA config |
-| `make up` / `make up-full` / `make down` | Docker app-only / full / stop |
-
-`scripts/quickstart.sh` (off-GPU run) · `scripts/deploy.sh [app|full|down]` (Docker).
-
-## Configuration
-All knobs are YAML under `configs/` (`model`, `lora`, `retrieval`, `server`, `eval`) — no magic
-constants. `common/config.py` loads them (with `${ENV}` expansion) and exposes typed models +
-an env-driven `Settings`. Secrets via `.env` / `os.environ` only.
-
-## Dependency layout
-Light, GPU-free runtime in `pyproject.toml` (locked in `uv.lock`) so `uv sync` is fast anywhere;
-heavy / CUDA-pinned stacks in `requirements/*.txt` for the GPU box; serving engines run from
-Docker, not pip. Optional extras: `ui`, `obs`, `eval`.
-
-## CORE vs STRETCH
-Everything above is CORE and implemented. STRETCH (started only on request): LiteLLM gateway,
-GRPO training run, Next.js frontend, Prometheus+Grafana, K8s/Helm, Qwen3.5-9B comparison.
-
-## What "SOTA" means here (honest framing)
-A Qwen3-8B + QLoRA system will **not** beat closed frontier models (GPT/Claude) on absolute
-benchmark scores, and this repo never claims it does. The defensible, still-strong targets:
-- **Standardized track** — *competitive among open models ≤10B* on **BFCL-V4** (AST accuracy)
-  and **τ²-bench** (pass^k), reported with **95% bootstrap CIs**, where **+QLoRA beats base by a
-  statistically significant margin** (paired bootstrap + Holm–Bonferroni).
-- **Self-built track** — **policy-violation rate → 0** (a hard, verifiable constraint; the
-  deterministic gate guarantees no forbidden action reaches the user), plus the *learning
-  signal* that QLoRA drives the model's **unsafe-tool-selection rate** toward zero.
-
-**Data hygiene (no leakage).** SFT trains on the **A-series** order pool; the held-out
-benchmark uses a **disjoint E-series** pool, and `tests/test_leakage.py` fails CI if the two
-order pools or any prompts overlap. So reported accuracy can't be inflated by training on the
-eval set — the first thing a reviewer checks.
-
-## Results (TBD until real runs)
-Filled from real runs only, with **95% bootstrap CIs (≥10k resamples)** via `eval/results.py`;
-latency on an **exclusive GPU**. (Off-GPU smoke validates the *pipeline*, not quality.)
-
-| Track | Benchmark / Metric | Base Qwen3-8B | + QLoRA-SFT | Notes |
-| --- | --- | --- | --- | --- |
-| Tool-calling | τ²-bench retail · pass^1 / pass^4 | TBD | TBD | combinatorial pass^k + CI |
-| Tool-calling | BFCL-V4 · AST accuracy | TBD | TBD | record V4 commit |
-| Service-desk (zh) | success rate | TBD | TBD | held-out E-pool |
-| Service-desk (zh) | unsafe-selection rate ↓ | TBD | TBD | learning signal → 0 |
-| Service-desk (zh) | policy-violation rate (reaches user) | **0** | **0** | gate-guaranteed |
-| RAG | groundedness (TruLens) | TBD | TBD | RAG triad |
-| Serving | p50 / p95 latency | TBD | TBD | exclusive GPU only |
-
-## Roadmap
-- [x] **Phase 0** — Scaffold · [x] **1** Serving client + mock · [x] **2** Agent + tools + policy + API + UI
-- [x] **3** Hybrid RAG + citations · [x] **4** Observability · [x] **5** Eval harness + stats
-- [x] **6** Deterministic CI gate · [x] **7** SFT data + LoRA dry-run (GRPO STRETCH)
-- [x] **8** Dockerfiles + one-command deploy + technical report
-- [ ] On-GPU runs (live SGLang, real τ²-bench/BFCL numbers, LoRA/GRPO training) · STRETCH scale-out
-
-## Troubleshooting
-- **`no kernel image is available for execution on the device`** → you installed cu124/cu126
-  torch on Blackwell. Reinstall from the **cu128** index (see Installation B).
-- **`Cannot connect to the Docker daemon`** → start Docker Desktop / `dockerd` (image builds need it).
-- **`401` from `/agent/query`** → add `-H "Authorization: Bearer <API_AUTH_TOKEN>"` (default `dev-token`).
-- **Agent calls a real server and hangs/errors off-GPU** → set `SERVING_BACKEND=mock`.
-- **Port already in use** → `PORT=9000 ./scripts/quickstart.sh` or change the published ports in compose.
-
-## Testing
-```bash
-make check        # uv run ruff check . && uv run pytest -q && uv run python -m eval.gate
-```
-CI (`.github/workflows/ci.yml`): `uv sync → ruff → pytest → deterministic eval gate → build app image`.
-
-## License
-[MIT](LICENSE). No fabricated metrics; frontends keep state in app/server memory (no browser storage).
+*Built by Yue (MA, Statistics) — targeting LLM/Agent/RAG engineering roles in China and PhD/RA
+positions in embodied-AI / LLM-agent labs in HK / Singapore / Europe.*

@@ -1,24 +1,27 @@
-# Serving (OpenAI-compatible). PRIMARY engine = SGLang (lmsysorg/sglang:blackwell).
-# DEFAULT TARGET = RTX PRO 6000 (96GB): serve bf16 (no --quantization). On a 5090,
-# set sglang.quantization to "fp8" (or awq). fp8 is also a throughput ablation here.
-backend: "sglang"                    # sglang | vllm | ollama
+# Serving (OpenAI-compatible). PRIMARY engine = vLLM (the engine actually used on the
+# RTX 5090 / Blackwell sm120). SGLang was abandoned on Blackwell (sgl-kernel has no sm120
+# build); its section below is kept for reference only. See BLACKWELL_NOTES.md.
+backend: "vllm"                      # vllm | sglang | ollama
 
-sglang:
+vllm:
+  model: "Qwen/Qwen3-8B"
+  port: 30000
+  enable_auto_tool_choice: true
+  tool_call_parser: "hermes"         # working tool parser for Qwen3 on vLLM 0.22.1
+  reasoning_parser: "qwen3"
+  gpu_memory_utilization: 0.85
+  max_model_len: 8192
+  # Set VLLM_USE_FLASHINFER_SAMPLER=0 and pass --generation-config vllm at launch.
+
+sglang:                              # reference only — NOT used on Blackwell (no sm120 kernel)
   model_path: "Qwen/Qwen3-8B"
   host: "0.0.0.0"
   port: 30000
-  # quantization: "fp8"              # uncomment for fp8 serving (5090, or throughput)
   tool_call_parser: "qwen25"
   reasoning_parser: "qwen3"
   attention_backend: "flashinfer"
-  grammar_backend: "xgrammar"        # enables tool_choice: "required"
+  grammar_backend: "xgrammar"
   mem_fraction_static: 0.85
-
-vllm:                                # documented alternative
-  model: "Qwen/Qwen3-8B"
-  port: 8000
-  enable_auto_tool_choice: true
-  tool_call_parser: "hermes"
 
 ollama:                              # local dev fallback (not for production results)
   base_url: "http://localhost:11434/v1"
@@ -30,6 +33,6 @@ sampling:
   max_tokens: 1024
 
 agent:
-  # 1 = single tool per turn (CI gate / zh service-desk / BFCL). Raise for multi-step
-  # agentic loops (tau2-bench): the model calls a tool, observes, then decides again.
-  max_steps: 1
+  # Production default = 2: lets the SFT-taught "check-then-act" pattern (query, then act)
+  # be scored correctly. 1 = single tool per turn. See agent/graph.py and report/case_study.md.
+  max_steps: 2

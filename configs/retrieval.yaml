@@ -1,4 +1,6 @@
-# RAG: LlamaIndex + Milvus + bge embeddings/reranker + hybrid (BM25 + dense).
+# RAG config for the PRODUCTION retrieval swap (LlamaIndex + Milvus + bge + hybrid).
+# NOTE: the reported run used the in-memory hashed-embedding + BM25 + RRF index (rag/),
+# which needs none of these services; this file targets the semantic-retrieval upgrade.
 embedding:
   model: "BAAI/bge-m3"               # alt: BAAI/bge-large-zh-v1.5
   dim: 1024

@@ -1,5 +1,11 @@
 # What changed (and why) — credibility & results upgrade
 
+> **Historical (pre-GPU-run) document.** This records the off-GPU credibility upgrade that
+> *preceded* the actual training/eval run. It predates the real stack discovery — references to
+> SGLang / cu128 here were superseded by **vLLM 0.22.1 / cu130** (see `BLACKWELL_NOTES.md`), and
+> the once-`TBD` numbers are now real (see [`../README.md`](../README.md),
+> [`case_study.md`](case_study.md), [`../CHANGELOG.md`](../CHANGELOG.md)). Kept for provenance.
+
 This branch turns the original scaffold (excellent engineering, but **every quality metric was
 `TBD` and not actually producible**) into a system that can yield **trustworthy, SOTA-class
 results** on a rented **RTX 5090 (AutoDL, ≤5 GPU-days)**. Summary of the work on top of the

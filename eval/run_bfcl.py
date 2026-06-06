@@ -1,7 +1,7 @@
 """Run BFCL-V4 against our served model and report AST accuracy.
 
 ``run()`` drives the gorilla *berkeley-function-call-leaderboard* CLI against our
-OpenAI-compatible SGLang endpoint, then parses the score summary. It is executed on the
+OpenAI-compatible vLLM endpoint, then parses the score summary. It is executed on the
 GPU box; the exact BFCL-V4 commit is recorded in ``eval/README.md`` and the result.
 ``smoke()`` runs a tiny synthetic slice to validate the harness off-GPU (NOT a BFCL number).
 The score parser is pure and unit-tested.

@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use PolicyArena, please cite it as below."
+title: "PolicyArena: A Policy-Compliant Tool-Calling + RAG Agent with Statistics-First Evaluation"
+abstract: >-
+  A Qwen3-8B policy-compliant tool-calling and RAG agent for a Chinese enterprise service
+  desk. QLoRA-SFT lifts held-out success_rate 53.1% -> 96.9% and grounding 25.0% -> 87.5%
+  (paired bootstrap, Holm-Bonferroni corrected) with zero policy violations reaching the
+  user, enforced by a deterministic policy gate. Includes CI-enforced data-leakage guards,
+  a decomposed safety metric (policy-violation vs unsafe-selection), and an honest failure
+  analysis of an unsafe-selection regression under a small-data SFT regime.
+type: software
+authors:
+  - name: "Yue"
+version: "0.1.0"
+date-released: "2026-06-06"
+license: MIT
+url: "https://github.com/IntheFesh/project1"
+repository-code: "https://github.com/IntheFesh/project1"
+keywords:
+  - llm agent
+  - tool calling
+  - retrieval-augmented generation
+  - qlora
+  - qwen3
+  - policy compliance
+  - statistics-first evaluation

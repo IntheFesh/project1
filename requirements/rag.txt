@@ -1,7 +1,9 @@
-# RAG deps — heavier stack (pulls torch). Install on the box that runs ingest/index.
+# RAG deps for the PRODUCTION retrieval swap (bge-m3 + reranker + Milvus). NOTE: the
+# reported run used the in-memory hashed-embedding + BM25 + RRF index (no external deps);
+# these are only needed to swap in semantic retrieval.
 #   uv pip install -r requirements/rag.txt
 #
-# On Blackwell, install torch from the cu128 index FIRST (see requirements/train.txt).
+# On Blackwell, install torch from the cu130 index FIRST (see requirements/train.txt).
 
 llama-index-core>=0.11
 llama-index-embeddings-huggingface>=0.3

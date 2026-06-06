@@ -61,6 +61,18 @@ class AgentState(BaseModel):
         """True iff no policy violation has been recorded this turn."""
         return len(self.violations) == 0
 
+    @property
+    def acted_tool(self) -> ToolCall | None:
+        """The tool the agent actually used this turn — multi-step aware.
+
+        Under the multi-step loop (``max_steps > 1``) a turn typically ends with a direct
+        answer, so ``selected_tool`` is ``None`` while ``executed_tools`` records what ran.
+        Callers that want "the tool the agent used" (eval harness, API trace, scenario
+        tests) should read this, not ``selected_tool``. Falls back to the current proposal
+        when nothing executed yet, and is ``None`` when the agent answered with no tool.
+        """
+        return self.executed_tools[-1] if self.executed_tools else self.selected_tool
+
     def last_user_text(self) -> str:
         """Return the most recent user message content (empty string if none)."""
         for message in reversed(self.messages):

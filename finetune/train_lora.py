@@ -2,7 +2,7 @@
 
 ``dry_run`` validates the config + dataset off-GPU (no torch import). ``train`` runs the real
 job and lazily imports the CUDA stack — install ``requirements/train.txt`` on the Blackwell
-box (cu128) first. Defaults come from ``configs/lora.yaml`` (RTX 5090 -> QLoRA 4-bit).
+box (cu130) first. Defaults come from ``configs/lora.yaml`` (RTX 5090 -> QLoRA 4-bit).
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def train(config_path: str = DEFAULT_CONFIG, data_path: str = DEFAULT_DATA) -> N
     except ImportError as exc:  # pragma: no cover - exercised only on the GPU box
         raise RuntimeError(
             "Training needs requirements/train.txt on the Blackwell GPU box "
-            "(torch from the cu128 index). See README."
+            "(torch from the cu130 index). See README / BLACKWELL_NOTES.md."
         ) from exc
 
     cfg = load_yaml(config_path)

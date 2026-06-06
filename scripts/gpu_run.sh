@@ -4,7 +4,7 @@
 # don't waste paid GPU minutes wiring the environment by hand.
 #
 # Usage:
-#   scripts/gpu_run.sh setup        # cu128 torch + train/rag/eval requirements
+#   scripts/gpu_run.sh setup        # cu130 torch + train/rag/eval requirements
 #   scripts/gpu_run.sh data         # build the SFT dataset (CPU; can run before power-on)
 #   scripts/gpu_run.sh train        # QLoRA-SFT -> adapter
 #   scripts/gpu_run.sh serve base   # launch SGLang for the base model (foreground)
@@ -48,9 +48,9 @@ wait_for_server() {
 }
 
 step_setup() {
-  log "installing cu128 torch + heavy CUDA stacks (Blackwell)"
-  uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-  python -c "import torch; al=torch.cuda.get_arch_list(); print('arch_list:', al); assert any('sm_120' in a for a in al), 'need sm_120 (cu128) wheels'"
+  log "installing cu130 torch + heavy CUDA stacks (Blackwell)"
+  uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+  python -c "import torch; al=torch.cuda.get_arch_list(); print('arch_list:', al); assert any('sm_120' in a for a in al), 'need sm_120 (cu130) wheels'"
   uv pip install -r requirements/train.txt
   uv pip install -r requirements/rag.txt
   uv pip install -r requirements/eval.txt

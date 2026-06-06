@@ -1,5 +1,11 @@
 # PolicyArena — Plan to Reach Credible, SOTA-Class Results
 
+> **Historical planning document (the run is now complete).** This was the pre-run plan; the
+> actual stack differed from what it assumed: serving used **vLLM 0.22.1 / cu130** (SGLang was
+> abandoned — no sm120 kernel), RAG ran in-memory, and τ²-bench/BFCL remain **future work**. For
+> the real results and stack see [`../README.md`](../README.md), [`case_study.md`](case_study.md),
+> and [`../BLACKWELL_NOTES.md`](../BLACKWELL_NOTES.md). Kept for provenance.
+
 > Goal: take the project from "complete scaffold, all metrics `TBD`" to **trustworthy,
 > publishable results** on (1) standardized benchmarks and (2) a self-built Chinese
 > service-desk domain. Author has a Blackwell GPU, so the on-GPU steps are runnable.

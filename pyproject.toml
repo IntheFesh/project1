@@ -1,12 +1,12 @@
 [project]
 name = "policyarena"
 version = "0.1.0"
-description = "PolicyArena — a policy-compliant tool-calling + RAG agent platform (Qwen3 / SGLang / LangGraph / Milvus)."
+description = "PolicyArena — a policy-compliant tool-calling + RAG agent (Qwen3-8B / vLLM / LangGraph / QLoRA), with a statistics-first evaluation harness."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "PolicyArena Contributors" }]
-keywords = ["llm", "agent", "rag", "tool-calling", "qwen", "sglang", "langgraph", "policy"]
+authors = [{ name = "Yue" }]
+keywords = ["llm", "agent", "rag", "tool-calling", "qwen", "vllm", "langgraph", "qlora", "policy"]
 
 # Light, GPU-free runtime so `uv sync` is fast and reproducible off the GPU box.
 # Heavy / CUDA stacks (training, RAG embeddings, serving engines) are pinned in
